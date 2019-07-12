@@ -5,9 +5,7 @@ import glob
 
 from models.models import ModelsFactory
 from options.test_options import TestOptions
-from utils.demo_visualizer import MotionImitationVisualizer
-
-import ipdb
+from utils.visualizer.demo_visualizer import MotionImitationVisualizer
 
 
 def get_dir(directory):

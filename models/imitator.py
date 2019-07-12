@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn.functional as F
-from .models import BaseModel
+from models.models import BaseRunnerModel, BaseTrainerModel
 from networks.networks import NetworksFactory, HumanModelRecovery
 from utils.nmr import SMPLRenderer
 from utils.util import to_tensor
@@ -10,7 +10,7 @@ import utils.cv_utils as cv_utils
 import ipdb
 
 
-class Imitator(BaseModel):
+class Imitator(BaseRunnerModel):
     def __init__(self, opt):
         super(Imitator, self).__init__(opt)
         self._name = 'Imitator'
@@ -239,7 +239,6 @@ class Imitator(BaseModel):
 
             if visualizer is not None:
                 visualizer.vis_named_img('src', img)
-                visualizer.vis_named_img('bg', src_info['bg'])
                 visualizer.vis_named_img('src_fim', src_info['fim'])
 
             if output_path:
@@ -285,8 +284,6 @@ class Imitator(BaseModel):
 
             tsf_color, tsf_mask = self.model.inference(src_encoder_outs, src_resnet_outs, tsf_inputs, T)
             tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
-            # # tsf_mask = (tsf_mask > 0.5).float()
-            # tsf_mask = self.correct_morph(tsf_mask, ks=3, mode='dilate')
             pred_imgs = tsf_mask * bg_img + (1 - tsf_mask) * tsf_color
 
             if visualizer is not None:

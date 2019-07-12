@@ -1,15 +1,10 @@
 import numpy as np
 import cv2
 import os
-import sys
 
 from models.models import ModelsFactory
 from options.test_options import TestOptions
-from utils.demo_visualizer import MotionImitationVisualizer
-
-import mi_api
-
-import ipdb
+from utils.visualizer.demo_visualizer import MotionImitationVisualizer
 
 
 def get_dir(directory):

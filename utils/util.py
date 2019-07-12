@@ -8,8 +8,6 @@ import torchvision
 import math
 import pickle
 
-import utils.mesh as mesh
-
 
 def morph(src_bg_mask, ks, mode='erode', kernel=None):
     n_ks = ks ** 2
@@ -34,29 +32,69 @@ def morph(src_bg_mask, ks, mode='erode', kernel=None):
     return out
 
 
+def cal_head_bbox(head_mask, factor=1.3):
+    """
+    Args:
+        head_mask (np.ndarray): (N, 1, 256, 256).
+        factor (float): the factor to enlarge the bbox of head.
+
+    Returns:
+        bbox (np.ndarray.int32): (N, 4), hear, 4 = (left_top_x, left_top_y, right_top_x, right_top_y)
+
+    """
+    bs, _, height, width = head_mask.shape
+
+    bbox = np.zeros((bs, 4), dtype=np.int32)
+    valid = np.ones((bs,), dtype=np.float32)
+
+    for i in range(bs):
+        mask = head_mask[i, 0]
+        ys, xs = np.where(mask == 1)
+
+        if len(ys) == 0:
+            valid[i] = 0.0
+            bbox[i, 2] = width
+            bbox[i, 3] = height
+            continue
+
+        lt_y = np.min(ys)   # left top of Y
+        lt_x = np.min(xs)   # left top of X
+
+        rt_y = np.max(ys)   # right top of Y
+        rt_x = np.max(xs)   # right top of X
+
+        h = rt_y - lt_y     # height of head
+        w = rt_x - lt_x     # width of head
+
+        cy = (lt_y + rt_y) // 2    # (center of y)
+        cx = (lt_x + rt_x) // 2    # (center of x)
+
+        _h = h * factor
+        _w = w * factor
+
+        _lt_y = max(0, int(cy - _h / 2))
+        _lt_x = max(0, int(cx - _w / 2))
+
+        _rt_y = min(height, int(cy + _h / 2))
+        _rt_x = min(width, int(cx + _w / 2))
+
+        if (_lt_x == _rt_x) or (_lt_y == _rt_y):
+            valid[i] = 0.0
+            bbox[i, 2] = width
+            bbox[i, 3] = height
+        else:
+            bbox[i, 0] = _lt_x
+            bbox[i, 1] = _lt_y
+            bbox[i, 2] = _rt_x
+            bbox[i, 3] = _rt_y
+
+    return bbox, valid
+
+
 def to_tensor(tensor):
     if isinstance(tensor, np.ndarray):
-        tensor = torch.FloatTensor(tensor)
+        tensor = torch.tensor(tensor).float()
     return tensor
-
-
-def plot_fim_enc(fim_enc, map_name):
-    # import matplotlib.pyplot as plt
-
-    if not isinstance(fim_enc, np.ndarray):
-        fim_enc = fim_enc.cpu().numpy()
-
-    if fim_enc.ndim != 4:
-        fim_enc = fim_enc[np.newaxis, ...]
-
-    fim_enc = np.transpose(fim_enc, axes=(0, 2, 3, 1))
-
-    imgs = []
-    for fim_i in fim_enc:
-        img = mesh.cvt_fim_enc(fim_i, map_name)
-        imgs.append(img)
-
-    return np.stack(imgs, axis=0)
 
 
 def tensor2im(img, imtype=np.uint8, unnormalize=True, idx=0, nrows=None):
@@ -83,6 +121,7 @@ def tensor2maskim(mask, imtype=np.uint8, idx=0, nrows=1):
         im = np.repeat(im, 3, axis=-1)
     return im
 
+
 def mkdirs(paths):
     if isinstance(paths, list) and not isinstance(paths, str):
         for path in paths:
@@ -90,14 +129,17 @@ def mkdirs(paths):
     else:
         mkdir(paths)
 
+
 def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
 
 def save_image(image_numpy, image_path):
     mkdir(os.path.dirname(image_path))
     image_pil = Image.fromarray(image_numpy)
     image_pil.save(image_path)
+
 
 def save_str_data(data, path):
     mkdir(os.path.dirname(path))
