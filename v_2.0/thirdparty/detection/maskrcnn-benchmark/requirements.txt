@@ -1,5 +1,0 @@
-ninja
-yacs
-cython
-matplotlib
-tqdm
