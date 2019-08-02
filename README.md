@@ -13,8 +13,8 @@ Python 3.6+ and PyTorch 1.0+.
 
 ### Installation
 ```shell
-    cd thirdparty/neural_renderer
-    python setup.py install
+cd thirdparty/neural_renderer
+python setup.py install
 ```
 
 ### Run Demos and Examples
