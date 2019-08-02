@@ -1,0 +1,13 @@
+# python requirements
+scipy
+numpy
+matplotlib
+scikit-image
+tqdm
+opencv-contrib-python
+absl-py
+ipdb
+torch
+torchvision
+visdom
+h5py

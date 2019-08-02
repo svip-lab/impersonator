@@ -11,6 +11,7 @@ import utils.cv_utils as cv_utils
 import utils.util as util
 
 import ipdb
+from tqdm import tqdm
 
 
 class Imitator(BaseModel):
@@ -55,8 +56,8 @@ class Imitator(BaseModel):
         return net
 
     def _create_generator(self):
-        net = NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3+self._G_cond_nc,
-                                          tsf_dim=3+self._G_cond_nc, repeat_num=self._opt.repeat_num)
+        net = NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3 + self._G_cond_nc,
+                                          tsf_dim=3 + self._G_cond_nc, repeat_num=self._opt.repeat_num)
 
         if self._opt.load_path:
             self._load_params(net, self._opt.load_path)
@@ -186,6 +187,65 @@ class Imitator(BaseModel):
             print('{} / {}'.format(t, length))
 
         return outputs
+
+    @torch.no_grad()
+    def inference_by_smpls(self, tgt_smpls, cam_strategy='smooth', output_dir='', visualizer=None):
+        length = len(tgt_smpls)
+
+        outputs = []
+        for t in tqdm(range(length)):
+            tgt_smpl = tgt_smpls[t] if tgt_smpls is not None else None
+
+            tsf_inputs = self.transfer_params_by_smpl(tgt_smpl, cam_strategy, t=t)
+            preds = self.forward(tsf_inputs, self.T, visualizer=visualizer)
+
+            if visualizer is not None:
+                gt = cv_utils.transform_img(self.tsf_info['image'], image_size=self._opt.image_size, transpose=True)
+                visualizer.vis_named_img('pred_' + cam_strategy, preds)
+                visualizer.vis_named_img('gt', gt[None, ...], denormalize=False)
+
+            preds = preds[0].permute(1, 2, 0)
+            preds = preds.cpu().numpy()
+            outputs.append(preds)
+
+            if output_dir:
+                cv_utils.save_cv2_img(preds, os.path.join(output_dir, 'pred_%.8d.jpg' % t), normalize=True)
+
+        return outputs
+
+    @torch.no_grad()
+    def transfer_params_by_smpl(self, tgt_smpl, cam_strategy='smooth', t=0):
+        # get source info
+        src_info = self.src_info
+        tgt_smpl = torch.tensor(tgt_smpl, dtype=torch.float32).cuda()[None, ...]
+
+        if t == 0 and cam_strategy == 'smooth':
+            self.first_cam = tgt_smpl[:, 0:3].clone()
+
+        # get transfer smpl
+        tsf_smpl = self.swap_smpl(src_info['cam'], src_info['shape'], tgt_smpl, cam_strategy=cam_strategy)
+        # transfer process, {'theta', 'cam', 'pose', 'shape', 'verts', 'j2d', 'j3d'}
+        tsf_info = self.hmr.get_details(tsf_smpl)
+
+        tsf_f2verts, tsf_fim, tsf_wim = self.render.render_fim_wim(tsf_info['cam'], tsf_info['verts'])
+        # src_f2pts = src_f2verts[:, :, :, 0:2]
+        tsf_info['fim'] = tsf_fim
+        tsf_info['wim'] = tsf_wim
+        tsf_info['cond'], _ = self.render.encode_fim(tsf_info['cam'], tsf_info['verts'], fim=tsf_fim, transpose=True)
+        # tsf_info['sil'] = util.morph((tsf_fim != -1).float(), ks=self._opt.ft_ks, mode='dilate')
+
+        T = self.render.cal_bc_transform(src_info['p2verts'], tsf_fim, tsf_wim)
+        tsf_img = F.grid_sample(src_info['img'], T)
+        tsf_inputs = torch.cat([tsf_img, tsf_info['cond']], dim=1)
+
+        # add target image to tsf info
+        tsf_info['tsf_img'] = tsf_img
+        tsf_info['T'] = T
+
+        self.T = T
+        self.tsf_info = tsf_info
+
+        return tsf_inputs
 
     @torch.no_grad()
     def swap_smpl(self, src_cam, src_shape, tgt_smpl, cam_strategy='smooth'):
