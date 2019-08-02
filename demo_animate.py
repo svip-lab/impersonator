@@ -48,7 +48,6 @@ def main(imitator, evaluator, output_dir='', visualizer=None):
 
     for v_name in video_names:
         src_info = pair_info['source'][v_name]
-
         src_outdir = get_dir(os.path.join(output_dir, cvt_name(v_name)))
 
         # 2. for-loop source image

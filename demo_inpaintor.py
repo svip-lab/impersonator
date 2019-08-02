@@ -17,5 +17,3 @@ if __name__ == "__main__":
     src_path = opt.src_path
 
     inpaintor.inference(src_path, smpl=None, visualizer=visualizer)
-
-
