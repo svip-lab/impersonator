@@ -1,13 +1,18 @@
 import os
+import argparse
+import glob
 import cv2
 from utils import cv_utils
 import torchvision.transforms as transforms
 import torch
 import numpy as np
-from models import ModelsFactory
+from networks.hmr import HumanModelRecovery
+from models.models import ModelsFactory
 from data.dataset import DatasetFactory
-from utils.visualizer.demo_visualizer import MotionImitationVisualizer
+from utils.demo_visualizer import MotionImitationVisualizer
 from options.test_options import TestOptions
+
+import time
 
 
 class MotionImitator(object):
@@ -16,8 +21,9 @@ class MotionImitator(object):
         self._model = ModelsFactory.get_by_name(self._opt.model, self._opt)
         self._model.set_eval()
 
-        # self._hmr = self._model.bdr.hmr
-        self._hmr = self._model.hmr
+        self._hmr = HumanModelRecovery(self._opt.smpl_model).cuda()
+        self.load_model(self._opt.hmr_model)
+        self._hmr.eval()
 
         self._transform = transforms.Compose([
             cv_utils.ImageTransformer(output_size=self._opt.image_size)]
@@ -31,7 +37,7 @@ class MotionImitator(object):
         img = cv_utils.transform_img(img, image_size=224) * 2 - 1.0  # hmr receive [-1, 1]
         img = img.transpose((2, 0, 1))
         img = torch.FloatTensor(img).cuda()[None, ...]
-        theta = self._hmr(img)
+        theta = self._hmr(img)[-1]
 
         return theta
 
@@ -83,7 +89,10 @@ class MotionImitator(object):
                 # generate cur image
                 # imgs = self._model.forward(keep_data_for_visuals=False, return_estimates=True)
                 # return imgs['concat']
-                cur_imgs = self._model.forward(keep_data_for_visuals=False, return_estimates=False)[0]
+                cur_imgs, _, _ = self._model.forward(keep_data_for_visuals=False, return_estimates=False)
+
+                if self._opt.seq_gen:
+                    inputs['src_img'] = cur_imgs
 
                 if self._opt.visual:
                     # self._visualizer.vis_preds_gts(cur_imgs, gts=None)
@@ -109,11 +118,18 @@ class MotionImitator(object):
 
 
 def main():
+    import ipdb
     opt = TestOptions().parse()
+
+    if not os.path.isdir(opt.output_dir):
+        os.makedirs(opt.output_dir)
 
     imitator = MotionImitator(opt)
     dataset = DatasetFactory.get_by_name(opt.dataset_mode, opt, is_for_train=False)
     videos_info = dataset.video_info
+
+    source_dataset = DatasetFactory.get_by_name('vis_mi', opt, is_for_train=False)
+    src_img_path = source_dataset.video_info[0]['images'][0]
 
     for v_id, info in enumerate(videos_info):
         # info = {
@@ -126,7 +142,8 @@ def main():
         images = info['images']
         image_path = images[0]
 
-        imitator.imitate(image_path, images)
+        imitator.imitate(image_path, images[0::10])
+        # imitator.imitate(src_img_path, images)
 
 
 if __name__ == '__main__':

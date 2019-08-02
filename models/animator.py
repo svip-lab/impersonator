@@ -10,24 +10,47 @@ import utils.cv_utils as cv_utils
 import ipdb
 
 
-class Imitator(BaseModel):
+class Animator(BaseModel):
+
+    PART_IDS = {
+        'body': [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        'upper_body': [1, 2, 3, 4, 9],
+        'lower_body': [4, 5],
+        'torso': [9],
+        'all': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    }
+
     def __init__(self, opt):
-        super(Imitator, self).__init__(opt)
-        self._name = 'Imitator'
+        super(Animator, self).__init__(opt)
+        self._name = 'Animator'
 
         # create networks
         self._init_create_networks()
 
         # prefetch variables
         self.src_info = None
+        self.ref_info = None
         self.tsf_info = None
         self.first_cam = None
+
+        # initialize T
         self.initial_T = torch.zeros(opt.image_size, opt.image_size, 2, dtype=torch.float32).cuda() - 1.0
-        self.T = None
+        self.initial_T_grid = self._make_grid()
+
+    def _make_grid(self):
+        # initialize T
+        image_size = self._opt.image_size
+        xy = torch.arange(0, image_size, dtype=torch.float32) / (image_size - 1) * 2 - 1.0
+        grid_y, grid_x = torch.meshgrid(xy, xy)
+
+        # 1. make mesh grid
+        T = torch.stack([grid_x, grid_y], dim=-1).cuda()  # (image_size, image_size, 2)
+
+        return T
 
     def _create_generator(self):
         net = NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3+self._G_cond_nc,
-                                          tsf_dim=3+self._G_cond_nc, repeat_num=self._opt.repeat_num).cuda()
+                                          tsf_dim=3+self._G_cond_nc, repeat_num=6).cuda()
 
         if self._opt.load_path:
             self._load_params(net, self._opt.load_path)
@@ -52,7 +75,7 @@ class Imitator(BaseModel):
     def _create_render(self, faces):
         render = SMPLRenderer(faces=faces, map_name=self._opt.map_name, uv_map_path=self._opt.uv_mapping,
                               tex_size=self._opt.tex_size, image_size=self._opt.image_size, fill_back=True,
-                              anti_aliasing=True, background_color=(0, 0, 0)).cuda()
+                              anti_aliasing=True, background_color=(0, 0, 0), has_front_map=True).cuda()
         return render
 
     def _init_create_networks(self):
@@ -69,37 +92,6 @@ class Imitator(BaseModel):
         theta = self.hmr(img)[-1]
 
         return theta
-
-    def imitate(self, tgt_paths, tgt_smpls=None, cam_strategy='smooth', output_dir='', visualizer=None):
-        length = len(tgt_paths)
-
-        outputs = []
-        for t in range(length):
-            tgt_path = tgt_paths[t]
-            tgt_smpl = tgt_smpls[t] if tgt_smpls is not None else None
-
-            tsf_inputs = self.transfer(tgt_path, tgt_smpl, cam_strategy, t=t)
-
-            preds = self.forward(tsf_inputs, self.T, visualizer=visualizer)
-            outputs.append(preds)
-
-            if visualizer is not None:
-                gt = cv_utils.transform_img(self.tsf_info['image'], image_size=self._opt.image_size, transpose=True)
-                visualizer.vis_named_img('pred_' + cam_strategy, preds)
-                visualizer.vis_named_img('gt', gt[None, ...], normalize=True)
-
-            if output_dir:
-                preds = preds[0].permute(1, 2, 0)
-                preds = preds.cpu().numpy()
-                filename = os.path.split(tgt_path)[-1]
-
-                cv_utils.save_cv2_img(preds, os.path.join(output_dir, 'pred_' + filename), normalize=True)
-                cv_utils.save_cv2_img(self.tsf_info['image'], os.path.join(output_dir, 'gt_' + filename),
-                                      image_size=self._opt.image_size)
-
-            print('{} / {}'.format(t, length))
-
-        return outputs
 
     def swap_smpl(self, src_cam, src_shape, tgt_smpl, cam_strategy='smooth'):
         tgt_cam = tgt_smpl[:, 0:3].contiguous()
@@ -121,9 +113,25 @@ class Imitator(BaseModel):
 
         return tsf_smpl
 
-    def transfer(self, tgt_path, tgt_smpl=None, cam_strategy='smooth', t=0):
+    def calculate_trans(self, bc_f2pts, src_fim, tsf_dim, mask):
+        bs = src_fim.shape[0]
+        T = self.initial_T.repeat(bs, 1, 1, 1)   # (bs, image_size, image_size, 2)
+
+        for i in range(bs):
+            Ti = T[i]
+
+            tsf_mask = mask[i]
+            tsf_i = tsf_dim[i, tsf_mask].long()
+
+            # (nf, 2)
+            tsf_flows = bc_f2pts[i, tsf_i]      # (nt, 2)
+            Ti[tsf_mask] = tsf_flows
+
+        return T
+
+    def transfer(self, tgt_path, tgt_smpl=None, cam_strategy='smooth', t=0, visualizer=None):
         with torch.no_grad():
-            # get source info
+            # 1. get source info
             src_info = self.src_info
 
             ori_img = cv_utils.read_cv2_img(tgt_path)
@@ -137,43 +145,63 @@ class Imitator(BaseModel):
             if t == 0 and cam_strategy == 'smooth':
                 self.first_cam = tgt_smpl[:, 0:3].clone()
 
-            # get transfer smpl
+            # 2. compute tsf smpl
             tsf_smpl = self.swap_smpl(src_info['cam'], src_info['shape'], tgt_smpl, cam_strategy=cam_strategy)
-            # transfer process, {'theta', 'cam', 'pose', 'shape', 'verts', 'j2d', 'j3d'}
             tsf_info = self.hmr.get_details(tsf_smpl)
-
-            tsf_img, _ = self.render.render(tsf_info['cam'], tsf_info['verts'], src_info['tex'],
-                                            reverse_yz=True, get_fim=False)
+            # add pose condition and face index map into source info
             tsf_info['cond'], tsf_info['fim'] = self.render.encode_fim(tsf_info['cam'],
                                                                        tsf_info['verts'], transpose=True)
+            # add part condition into source info
+            tsf_info['part'] = self.render.encode_front_fim(tsf_info['fim'], transpose=True)
+
+            # 3. calculate syn front image and transformation flows
+            ref_info = self.ref_info
+            selected_part_id = self.PART_IDS['body']
+            left_id = [i for i in self.PART_IDS['all'] if i not in selected_part_id]
+
+            src_part_mask = (torch.sum(tsf_info['part'][:, left_id, ...], dim=1) != 0).byte()
+            ref_part_mask = (torch.sum(tsf_info['part'][:, selected_part_id, ...], dim=1) != 0).byte()
+
+            T_s = self.calculate_trans(src_info['bc_f2pts'], src_info['fim'], tsf_info['fim'], src_part_mask)
+            T_r = self.calculate_trans(ref_info['bc_f2pts'], ref_info['fim'], tsf_info['fim'], ref_part_mask)
+
+            tsf_s = self.model.transform(src_info['image'], T_s)
+            tsf_r = self.model.transform(ref_info['image'], T_r)
+
+            tsf_img = tsf_s * src_part_mask.float() + tsf_r * ref_part_mask.float()
             tsf_inputs = torch.cat([tsf_img, tsf_info['cond']], dim=1)
 
-            T = self.calculate_trans(src_info['bc_f2pts'], src_info['fim'], tsf_info['fim'])
+            preds = self.forward2(tsf_inputs, src_info['feats'], T_s, ref_info['feats'], T_r, src_info['bg'])
 
-            # add target image to tsf info
-            tsf_info['image'] = ori_img
+            if visualizer is not None:
+                visualizer.vis_named_img('src', src_info['image'])
+                visualizer.vis_named_img('ref', ref_info['image'])
+                visualizer.vis_named_img('src_cond', src_info['cond'])
+                visualizer.vis_named_img('ref_cond', ref_info['cond'])
+                visualizer.vis_named_img('tsf_cond', tsf_info['cond'])
+                visualizer.vis_named_img('tsf_s', tsf_s)
+                visualizer.vis_named_img('tsf_r', tsf_r)
+                visualizer.vis_named_img('tsf_img', tsf_img)
+                visualizer.vis_named_img('preds', preds)
+                visualizer.vis_named_img('src_part_mask', src_part_mask)
+                visualizer.vis_named_img('ref_part_mask', ref_part_mask)
 
-            self.T = T
-            self.tsf_info = tsf_info
+            return preds
 
-            return tsf_inputs
+    def animate_setup(self, src_path, ref_path, src_smpl=None, ref_smpl=None, output_dir=''):
 
-    def calculate_trans(self, bc_f2pts, src_fim, tsf_dim):
-        bs = src_fim.shape[0]
-        T = self.initial_T.repeat(bs, 1, 1, 1)   # (bs, image_size, image_size, 2)
+        with torch.no_grad():
+            self.src_info = self.personalize(src_path, src_smpl)
+            self.ref_info = self.personalize(ref_path, ref_smpl)
 
-        tsf_ids = tsf_dim != -1
+    def animate(self, img_paths, smpls=None, cam_strategy='smooth', output_dir='', visualizer=None):
+        length = len(img_paths)
 
-        for i in range(bs):
-            Ti = T[i]
+        for t in range(length):
+            img_path = img_paths[t]
+            smpl = smpls[t] if smpls is not None else None
 
-            tsf_i = tsf_ids[i]
-
-            # (nf, 2)
-            tsf_flows = bc_f2pts[i, tsf_dim[i, tsf_i].long()]      # (nt, 2)
-            Ti[tsf_i] = tsf_flows
-
-        return T
+            preds = self.transfer(img_path, smpl, cam_strategy=cam_strategy, t=t, visualizer=visualizer)
 
     def get_src_bc_f2pts(self, src_cams, src_verts):
 
@@ -183,7 +211,7 @@ class Imitator(BaseModel):
 
         return bc_f2pts
 
-    def personalize(self, src_path, src_smpl=None, output_path='', visualizer=None):
+    def personalize(self, src_path, src_smpl=None):
 
         with torch.no_grad():
             ori_img = cv_utils.read_cv2_img(src_path)
@@ -206,7 +234,7 @@ class Imitator(BaseModel):
             src_info['bc_f2pts'] = self.get_src_bc_f2pts(src_info['cam'], src_info['verts'])
 
             # add image to source info
-            src_info['image'] = ori_img
+            src_info['image'] = img
 
             # add texture into source info
             _, src_info['tex'] = self.render.forward(src_info['cam'], src_info['verts'],
@@ -216,34 +244,22 @@ class Imitator(BaseModel):
             src_info['cond'], src_info['fim'] = self.render.encode_fim(src_info['cam'],
                                                                        src_info['verts'], transpose=True)
 
+            # add part condition into source info
+            src_info['part'] = self.render.encode_front_fim(src_info['fim'], transpose=True)
+
             # bg input and inpaiting background
-            # TODO
-            if self._opt.bg_replace:
-                src_bg_mask = self.correct_morph(src_info['cond'][:, -1:, :, :], ks=15, mode='erode')
-            else:
-                src_bg_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=15, mode='erode')
+            src_bg_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=15, mode='erode')
             bg_inputs = torch.cat([img * src_bg_mask, src_bg_mask], dim=1)
             src_info['bg'] = self.model.bg_model(bg_inputs)
-
-            # TODO
-            if self._opt.bg_replace:
-                src_info['bg'] = bg_inputs[:, 0:3, ...] + (1 - src_bg_mask) * src_info['bg']
-
+            #
             # source identity
-            # src_crop_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=3, mode='erode')
-            src_crop_mask = self.correct_morph(src_info['cond'][:, -1:, :, :], ks=3, mode='erode')
+            src_crop_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=3, mode='erode')
             src_inputs = torch.cat([img * (1 - src_crop_mask), src_info['cond']], dim=1)
             src_info['feats'] = self.model.src_model.inference(src_inputs)
+            #
+            # self.src_info = src_info
 
-            self.src_info = src_info
-
-            if visualizer is not None:
-                visualizer.vis_named_img('src', img)
-                visualizer.vis_named_img('bg', src_info['bg'])
-                visualizer.vis_named_img('src_fim', src_info['fim'])
-
-            if output_path:
-                cv_utils.save_cv2_img(src_info['image'], output_path, image_size=self._opt.image_size)
+            return src_info
 
     def morph(self, src_bg_mask, ks, mode='erode'):
         n_ks = ks ** 2
@@ -257,40 +273,35 @@ class Imitator(BaseModel):
 
         return out
 
-    def correct_morph(self, src_bg_mask, ks, mode='erode'):
-        device = src_bg_mask.device
-
-        n_ks = ks ** 2
-        kernel = torch.ones(1, 1, ks, ks, dtype=torch.float32).to(device)
-
-        pad_s = ks // 2
-        src_bg_mask_pad = F.pad(src_bg_mask, [pad_s, pad_s, pad_s, pad_s], value=1.0)
-        # print(src_bg_mask.shape, src_bg_mask_pad.shape)
-        out = F.conv2d(src_bg_mask_pad, kernel)
-        # print(out.shape)
-
-        if mode == 'erode':
-            out = (out == n_ks).float()
-        else:
-            out = (out >= 1).float()
-
-        return out
-
-    def forward(self, tsf_inputs, T, visualizer=None):
+    def forward(self, tsf_inputs, feats, T, bg):
         with torch.no_grad():
             # generate fake images
-
-            bg_img = self.src_info['bg']
-            src_encoder_outs, src_resnet_outs = self.src_info['feats']
+            src_encoder_outs, src_resnet_outs = feats
 
             tsf_color, tsf_mask = self.model.inference(src_encoder_outs, src_resnet_outs, tsf_inputs, T)
             tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
-            # # tsf_mask = (tsf_mask > 0.5).float()
-            # tsf_mask = self.correct_morph(tsf_mask, ks=3, mode='dilate')
-            pred_imgs = tsf_mask * bg_img + (1 - tsf_mask) * tsf_color
+            pred_imgs = tsf_mask * bg + (1 - tsf_mask) * tsf_color
 
-            if visualizer is not None:
-                visualizer.vis_named_img('tsf_mask', tsf_mask)
+        return pred_imgs
+
+    def forward2(self, tsf_inputs, feats21, T21, feats11, T11, bg):
+        with torch.no_grad():
+            # generate fake images
+            src_encoder_outs21, src_resnet_outs21 = feats21
+            src_encoder_outs11, src_resnet_outs11 = feats11
+
+            tsf_color, tsf_mask = self.model.swap(tsf_inputs, src_encoder_outs21, src_encoder_outs11,
+                                                  src_resnet_outs21, src_resnet_outs11, T21, T11)
+            tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
+            pred_imgs = tsf_mask * bg + (1 - tsf_mask) * tsf_color
+
+        return pred_imgs
+
+    def auto_encoder(self, tsf_inputs, bg_img):
+        with torch.no_grad():
+            tsf_color, tsf_mask = self.model.src_model(tsf_inputs)
+            tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
+            pred_imgs = tsf_mask * bg_img + (1 - tsf_mask) * tsf_color
 
         return pred_imgs
 

@@ -8,12 +8,20 @@ python test.py --gpu_ids 2 \
 
 
 # 6 epoch
+python test.py --gpu_ids 2 \
+    --model impersonator_02 \
+    --dataset_mode  fast_mi \
+    --name impersonator_02 \
+    --image_size 256  \
+    --map_name uv_seg \
+    --visual
+
+
 python test.py --gpu_ids 8 \
     --data_dir  /public/liuwen/p300/human_pose/processed \
-    --place_dir  /public/liuwen/p300/places365_standard \
     --checkpoints_dir  /public/liuwen/p300/models \
-    --model impersonator \
-    --name impersonator \
+    --model impersonator_02 \
+    --name impersonator_02 \
     --dataset_mode  mi_v2 \
     --image_size 256  \
     --map_name uv_seg \

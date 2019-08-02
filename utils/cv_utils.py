@@ -37,10 +37,7 @@ def save_cv2_img(img, path, image_size=None, normalize=False):
 
 
 def transform_img(image, image_size, transpose=False):
-    height, width, _ = image.shape
-
-    if height != image_size:
-        image = cv2.resize(image, (image_size, image_size))
+    image = cv2.resize(image, (image_size, image_size))
     image = image.astype(np.float32)
     image /= 255.0
 
@@ -179,38 +176,6 @@ def get_rotated_smpl_pose(pose, theta):
     rotated_pose[:3] = new_global_pose
 
     return rotated_pose
-
-
-def seamless_paste(src, dst, mask):
-    """
-    :param src:
-    :param dst:
-    :param mask:
-    :return:
-    """
-    mask *= 255
-    mask = mask.astype(np.uint8)
-
-    src = (src + 1) / 2 * 255
-    src = src.astype(np.uint8)
-
-    # The location of the center of the src in the dst
-    # width, height, channels = dst.shape
-    # center = (height // 2, width // 2)
-    y, x, _ = np.where(mask != 0)
-    #
-    center = (int(np.mean(x)), int(np.mean(y)))
-    print(center)
-
-    dst = (dst + 1) / 2 * 255
-    dst = dst.astype(np.uint8)
-    print(src.max(), src.min(), dst.max(), dst.min())
-    # Seamlessly clone src into dst and put the results in output
-    normal_clone = cv2.seamlessClone(src, dst, mask, center, cv2.NORMAL_CLONE)
-    # normal_clone = cv2.seamlessClone(src, dst, mask, center, cv2.MIXED_CLONE)
-    normal_clone = normal_clone.astype(np.float32)
-    normal_clone /= 255.0
-    return normal_clone
 
 
 class ImageTransformer(object):

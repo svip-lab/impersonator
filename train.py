@@ -2,8 +2,9 @@ import time
 from options.train_options import TrainOptions
 from data.custom_dataset_data_loader import CustomDatasetDataLoader
 from models.models import ModelsFactory
-from utils.visualizer.tb_visualizer import TBVisualizer
+from utils.tb_visualizer import TBVisualizer
 from collections import OrderedDict
+import os
 
 
 class Train(object):

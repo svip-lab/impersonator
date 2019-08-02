@@ -26,30 +26,6 @@ class DatasetFactory(object):
             from data.motion_transfer import MIv2PlaceDataset
             dataset = MIv2PlaceDataset(opt, is_for_train)
 
-        elif dataset_name == 'smpl_place':
-            from data.place_dataset import SMPLPlaceDataset
-            dataset = SMPLPlaceDataset(opt, is_for_train)
-
-        elif dataset_name == 'imper_sample':
-            from data.motion_transfer import ImPerSampleDataset
-            dataset = ImPerSampleDataset(opt, is_for_train)
-
-        elif dataset_name == 'deep_fashion':
-            from data.motion_transfer import DeepFashionPairSampleDataset
-            dataset = DeepFashionPairSampleDataset(opt, is_for_train)
-
-        elif dataset_name == 'df_imper':
-            from data.motion_transfer import create_imper_fashion_pair_dataset
-            dataset = create_imper_fashion_pair_dataset(opt, is_for_train)
-
-        elif dataset_name == 'imper_pair':
-            from data.motion_transfer import ImperPairSampleDataset
-            dataset = ImperPairSampleDataset(opt, is_for_train)
-
-        elif dataset_name == 'deep_fashion_hmr':
-            from data.motion_transfer import DeepFashionHmrPairSampleDataset
-            dataset = DeepFashionHmrPairSampleDataset(opt, is_for_train)
-
         else:
             raise ValueError("Dataset [%s] not recognized." % dataset_name)
 

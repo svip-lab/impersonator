@@ -2,13 +2,12 @@ import time
 from options.train_options import TrainOptions
 from data.custom_dataset_data_loader import CustomDatasetDataLoader
 from models.models import ModelsFactory
-from utils.visualizer.demo_visualizer import MotionImitationVisualizer
+from utils.demo_visualizer import MotionImitationVisualizer
+from collections import OrderedDict
+import os
 
-# --ip http://10.19.126.34 --port 10087
-ip = 'http://10.19.126.34'
-port = 10087
-# ip = 'http://10.10.10.100'
-# port = 31100
+ip = 'http://10.10.10.100'
+port = 31102
 
 
 class Train(object):
@@ -53,60 +52,7 @@ class Train(object):
             if i_epoch > self._opt.nepochs_no_decay:
                 self._model.update_learning_rate()
 
-    def collect_samples(self):
-        import numpy as np
-        from utils.util import write_pickle_file
-        data = {
-            'src_imgs': [],
-            'ref_imgs': [],
-            'dst_imgs': [],
-            'obj_imgs': [],
-            'obj_masks': []
-        }
-        for i in range(50):
-            src_imgs, ref_imgs, dst_imgs, obj_imgs, obj_masks = self._model.debug_get_data(self._visualizer)
-            data['src_imgs'].append(src_imgs)
-            data['ref_imgs'].append(ref_imgs)
-            data['dst_imgs'].append(dst_imgs)
-            data['obj_imgs'].append(obj_imgs)
-            data['obj_masks'].append(obj_masks)
-            print(i)
-
-        for key in data:
-            data[key] = np.concatenate(data[key])
-            print(key, data[key].shape)
-
-        write_pickle_file('samples.pkl', data)
-
-    # def _train_epoch(self, i_epoch):
-    #     epoch_iter = 0
-    #     self._model.set_train()
-    #     for i_train_batch, train_batch in enumerate(self._dataset_train):
-    #         iter_start_time = time.time()
-    #
-    #         # display flags
-    #         do_visuals = self._last_display_time is None or time.time() - self._last_display_time > self._opt.display_freq_s
-    #         do_print_terminal = time.time() - self._last_print_time > self._opt.print_freq_s or do_visuals
-    #
-    #         # train model
-    #         self._model.set_input(train_batch)
-    #         print('set input')
-    #
-    #         # debug
-    #         # self._model.debug(self._visualizer)
-    #         self.collect_samples()
-    #         self._model.debug_wrap(self._visualizer)
-
     def _train_epoch(self, i_epoch):
-        import numpy as np
-        from utils.util import write_pickle_file
-        data = {
-            'src_imgs': [],
-            'ref_imgs': [],
-            'dst_imgs': [],
-            'obj_imgs': [],
-            'obj_masks': []
-        }
         epoch_iter = 0
         self._model.set_train()
         for i_train_batch, train_batch in enumerate(self._dataset_train):
@@ -120,22 +66,19 @@ class Train(object):
             self._model.set_input(train_batch)
             print('set input')
 
-            src_imgs, ref_imgs, dst_imgs, obj_imgs, obj_masks = self._model.debug_get_data(self._visualizer)
-            data['src_imgs'].append(src_imgs)
-            data['ref_imgs'].append(ref_imgs)
-            data['dst_imgs'].append(dst_imgs)
-            data['obj_imgs'].append(obj_imgs)
-            data['obj_masks'].append(obj_masks)
-            print(i_train_batch)
+            # debug
+            self._model.debug_fim_transfer(self._visualizer)
+            # self._model.debug_binary_fim(self._visualizer)
+            # self._model.debug_face(self._visualizer)
+            # self._model.debug(self._visualizer)
+            # self._model.debug_front_face(self._visualizer)
 
-            if i_train_batch >= 40:
-                break
-
-        for key in data:
-            data[key] = np.concatenate(data[key])
-            print(key, data[key].shape)
-
-        write_pickle_file('samples.pkl', data)
+            # train_generator = ((i_train_batch+1) % self._opt.train_G_every_n_iterations == 0) or do_visuals
+            # self._model.optimize_parameters(keep_data_for_visuals=do_visuals, train_generator=train_generator)
+            #
+            # # update epoch info
+            # self._total_steps += self._opt.batch_size
+            # epoch_iter += self._opt.batch_size
 
 
 if __name__ == "__main__":

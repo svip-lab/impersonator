@@ -1,11 +1,13 @@
 import numpy as np
 import cv2
 import os
-import glob
+import sys
 
 from models.models import ModelsFactory
 from options.test_options import TestOptions
 from utils.demo_visualizer import MotionImitationVisualizer
+
+import mi_api
 
 import ipdb
 
@@ -43,7 +45,7 @@ def get_img_name(file_path):
     return filename
 
 
-def main(imitator, evaluator, output_dir='', visualizer=None):
+def main(viewer, evaluator, cam_strategy='smooth', output_dir='', visualizer=None):
     # 1. for-loop source info
     video_names = evaluator.dataset.video_names
     pair_info = evaluator.dataset.pair_info
@@ -60,54 +62,39 @@ def main(imitator, evaluator, output_dir='', visualizer=None):
             src_name = src_img_name.split('.')[0]
 
             # personalize
-            src_save_path = os.path.join(src_outdir, src_img_name) if output_dir else  ''
-            imitator.personalize(src_path, src_smpl, src_save_path)
+            src_save_path = os.path.join(src_outdir, src_img_name) if output_dir else ''
+            swapper.src_info = viewer.personalize(src_path, src_smpl=src_smpl)
+
+            if output_dir:
+                save_image(src_path, src_outdir + '/' + 'src_' + src_img_name)
 
             if visualizer is not None:
-                visualizer.vis_named_img('bg', imitator.src_info['bg'])
+                visualizer.vis_named_img('bg', swapper.src_info['bg'])
+                visualizer.vis_named_img('src', swapper.src_info['image'])
 
-            # 3. cross(self) - imitator (for-loop)
-            used_a = False
-            for cross_v_name in video_names:
-                cross_mi_info = pair_info['cross_mi'][cross_v_name]
-
-                if cross_mi_info['a_pose'] and used_a:
-                    continue
-
-                if cross_mi_info['a_pose']:
-                    used_a = True
-
-                tgt_outdir = get_dir(os.path.join(src_outdir, src_name, cvt_name(cross_v_name))) if output_dir else ''
-
-                is_self = v_name == cross_v_name
-                imitator.imitate(tgt_paths=cross_mi_info['images'], tgt_smpls=cross_mi_info['smpls'],
-                                 output_dir=tgt_outdir, visualizer=visualizer)
+            break
 
 
 if __name__ == "__main__":
 
     opt = TestOptions().parse()
 
-    # set animator
-    animator = ModelsFactory.get_by_name(opt.model, opt)
+    # set evaluator
+    evaluator = mi_api.Evaluator('/root/poseGANs/mi_api/mi_api/motion_imitator_info/protocol.ini')
+
+    # set imitator
+    swapper = ModelsFactory.get_by_name(opt.model, opt)
 
     if opt.visual:
         visualizer = MotionImitationVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
     else:
         visualizer = None
 
-    src_path = opt.src_path
-    ref_path = opt.ref_path
-    tgt_path = opt.tgt_path
-
-    animator.animate_setup(src_path, ref_path)
-
-    imgs_paths = []
-    if os.path.isdir(tgt_path):
-        imgs_paths = glob.glob(os.path.join(tgt_path, '*.jpg'))
-        imgs_paths.sort()
+    if opt.output_dir:
+        output_dir = os.path.join(opt.output_dir, opt.name + '_' + str(opt.load_epoch) + '_' + str(opt.cam_strategy))
     else:
-        imgs_paths = [tgt_path]
+        output_dir = ''
+    # ipdb.set_trace()
 
-    animator.animate(img_paths=imgs_paths, cam_strategy=opt.cam_strategy, output_dir='', visualizer=visualizer)
-
+    main(swapper, evaluator, output_dir=output_dir, cam_strategy=opt.cam_strategy,
+         visualizer=visualizer)

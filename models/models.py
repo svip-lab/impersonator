@@ -3,7 +3,7 @@ import torch
 from torch.optim import lr_scheduler
 from collections import OrderedDict
 
-from networks.bodymesh.mesh import get_map_fn_dim
+from utils.mesh import get_map_fn_dim
 
 
 class ModelsFactory(object):
@@ -14,43 +14,53 @@ class ModelsFactory(object):
     def get_by_name(model_name, *args, **kwargs):
         model = None
 
-        is_train = args[0].is_train
-        if model_name == 'background_inpaintor':
-            if is_train:
-                from models.background import InpaintorTrainer
-                model = InpaintorTrainer(*args, **kwargs)
-            else:
-                from models.background import Inpaintor
-                model = Inpaintor(*args, **kwargs)
+        if model_name == 'concat':
+            from .baseline import ConcatBaseline
+            model = ConcatBaseline(*args, **kwargs)
 
-        elif model_name == 'imper_v2':
-            from models.trainer_imper_v2 import ImperTrainer
-            model = ImperTrainer(*args, **kwargs)
+        elif model_name == 'texture_warping':
+            from .baseline import TextureWarpingBaseline
+            model = TextureWarpingBaseline(*args, **kwargs)
 
-        elif model_name == 'imper_v2_fixbg':
-            from models.trainer_imper_v2 import ImperTrainerFixBG
-            model = ImperTrainerFixBG(*args, **kwargs)
+        elif model_name == 'feature_warping':
+            from .baseline import FeatureWarpingBaseline
+            model = FeatureWarpingBaseline(*args, **kwargs)
 
-        elif model_name == 'imper_v2_fixbg_imitator':
-            from models.trainer_imper_v2 import Imitator
+        elif model_name == 'imitator':
+            from .imitator import Imitator
             model = Imitator(*args, **kwargs)
 
-        elif model_name == 'concat':
-            from models.trainer_baselines import ConcatTrainer
-            model = ConcatTrainer(*args, **kwargs)
+        elif model_name == 'imitator_v2':
+            from .imitator_v2 import Imitator
+            model = Imitator(*args, **kwargs)
 
-        elif model_name == 'texture':
-            from models.trainer_baselines import TextureWarpingTrainer
-            model = TextureWarpingTrainer(*args, **kwargs)
+        elif model_name == 'swapper':
+            from .swapper import Swapper
+            model = Swapper(*args, **kwargs)
 
-        elif model_name == 'feature':
-            from models.trainer_baselines import FeatureWarpingTrainer
-            model = FeatureWarpingTrainer(*args, **kwargs)
+        elif model_name == 'swapper_v2':
+            from .swapper_v2 import Swapper
+            model = Swapper(*args, **kwargs)
 
-        elif model_name == 'impersonator':
-            from models.impersonator import ImpersonatorTrainer
-            # from models.impersonator import Impersonator
-            model = ImpersonatorTrainer(*args, **kwargs)
+        elif model_name == 'viewer':
+            from .viewer import Viewer
+            model = Viewer(*args, **kwargs)
+
+        elif model_name == 'animator':
+            from .animator import Animator
+            model = Animator(*args, **kwargs)
+
+        elif model_name == 'impersonator_02':
+            from .impersonator_2 import Impersonator
+            model = Impersonator(*args, **kwargs)
+
+        elif model_name == 'impersonator_trainer':
+            from .impersonator_trainer import Impersonator
+            model = Impersonator(*args, **kwargs)
+
+        elif model_name == 'impersonator_trainer_aug':
+            from .impersonator_trainer_aug import Impersonator
+            model = Impersonator(*args, **kwargs)
 
         else:
             raise ValueError("Model %s not recognized." % model_name)
@@ -84,55 +94,7 @@ class BaseModel(object):
     def cond_nc(self):
         if self._opt.map_name:
             nc = get_map_fn_dim(self._opt.map_name)
-            # _G_cond_nc, _D_cond_nc = nc, nc + nc
-            _G_cond_nc, _D_cond_nc = nc, nc
-        else:
-            _G_cond_nc = self._opt.cond_nc
-            _D_cond_nc = self._opt.cond_nc
-
-        return _G_cond_nc, _D_cond_nc
-
-    def _load_network(self, network, network_label, epoch_label, need_module=False):
-        load_filename = 'net_epoch_%s_id_%s.pth' % (epoch_label, network_label)
-        load_path = os.path.join(self._save_dir, load_filename)
-
-        self._load_params(network, load_path, need_module)
-
-    def _load_params(self, network, load_path, need_module=False):
-        assert os.path.exists(
-            load_path), 'Weights file not found. Have you trained a model!? We are not providing one %s' % load_path
-
-        def load(model, orig_state_dict):
-            state_dict = OrderedDict()
-            for k, v in orig_state_dict.items():
-                if 'module' in k:
-                    name = k[7:]  # remove `module.`
-                else:
-                    name = k
-                state_dict[name] = v
-
-            # load params
-            model.load_state_dict(state_dict)
-
-        save_data = torch.load(load_path)
-        if need_module:
-            network.load_state_dict(save_data)
-        else:
-            load(network, save_data)
-        print('loaded net: %s' % load_path)
-
-
-class BaseTrainerModel(BaseModel):
-
-    def __init__(self, opt):
-        super(BaseTrainerModel, self).__init__(opt=opt)
-
-        self._name = 'BaseTrainerModel'
-
-    def cond_nc(self):
-        if self._opt.map_name:
-            nc = get_map_fn_dim(self._opt.map_name)
-            _G_cond_nc, _D_cond_nc = nc, nc
+            _G_cond_nc, _D_cond_nc = nc, nc + nc
         else:
             _G_cond_nc = self._opt.cond_nc
             _D_cond_nc = self._opt.cond_nc
@@ -196,6 +158,35 @@ class BaseTrainerModel(BaseModel):
         torch.save(network.state_dict(), save_path)
         print('saved net: %s' % save_path)
 
+    def _load_network(self, network, network_label, epoch_label, need_module=False):
+        load_filename = 'net_epoch_%s_id_%s.pth' % (epoch_label, network_label)
+        load_path = os.path.join(self._save_dir, load_filename)
+
+        self._load_params(network, load_path, need_module)
+
+    def _load_params(self, network, load_path, need_module=False):
+        assert os.path.exists(
+            load_path), 'Weights file not found. Have you trained a model!? We are not providing one %s' % load_path
+
+        def load(model, orig_state_dict):
+            state_dict = OrderedDict()
+            for k, v in orig_state_dict.items():
+                if 'module' in k:
+                    name = k[7:]  # remove `module.`
+                else:
+                    name = k
+                state_dict[name] = v
+
+            # load params
+            model.load_state_dict(state_dict)
+
+        save_data = torch.load(load_path)
+        if need_module:
+            network.load_state_dict(save_data)
+        else:
+            load(network, save_data)
+        print('loaded net: %s' % load_path)
+
     def update_learning_rate(self):
         pass
 
@@ -219,17 +210,3 @@ class BaseTrainerModel(BaseModel):
         else:
             return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
         return scheduler
-
-
-class BaseRunnerModel(BaseModel):
-
-    def __init__(self, opt):
-        super(BaseRunnerModel, self).__init__(opt)
-
-        self._name = 'BaseRunnerModel'
-
-    def visualize(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def inference(self, *args, **kwargs):
-        raise NotImplementedError

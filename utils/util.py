@@ -8,6 +8,8 @@ import torchvision
 import math
 import pickle
 
+import utils.mesh as mesh
+
 
 def morph(src_bg_mask, ks, mode='erode', kernel=None):
     n_ks = ks ** 2
@@ -93,8 +95,27 @@ def cal_head_bbox(head_mask, factor=1.3):
 
 def to_tensor(tensor):
     if isinstance(tensor, np.ndarray):
-        tensor = torch.tensor(tensor).float()
+        tensor = torch.FloatTensor(tensor)
     return tensor
+
+
+def plot_fim_enc(fim_enc, map_name):
+    # import matplotlib.pyplot as plt
+
+    if not isinstance(fim_enc, np.ndarray):
+        fim_enc = fim_enc.cpu().numpy()
+
+    if fim_enc.ndim != 4:
+        fim_enc = fim_enc[np.newaxis, ...]
+
+    fim_enc = np.transpose(fim_enc, axes=(0, 2, 3, 1))
+
+    imgs = []
+    for fim_i in fim_enc:
+        img = mesh.cvt_fim_enc(fim_i, map_name)
+        imgs.append(img)
+
+    return np.stack(imgs, axis=0)
 
 
 def tensor2im(img, imtype=np.uint8, unnormalize=True, idx=0, nrows=None):
@@ -129,10 +150,13 @@ def mkdirs(paths):
     else:
         mkdir(paths)
 
+    return paths
+
 
 def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+    return path
 
 
 def save_image(image_numpy, image_path):

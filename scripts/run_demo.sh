@@ -1,16 +1,17 @@
-#--src_path /home/piaozx/liuwen/p300/imgs/3.jpg    \
-#--tgt_path /home/piaozx/liuwen/p300/human_pose/processed/motion_transfer_HD/001/1/2/0640.jpg  --visual \
-
-python demo_inpaintor.py --gpu_ids 8 \
-    --model background_inpaintor \
-    --name background_inpaintor \
+python demo.py --gpu_ids 9 \
+    --model imitator \
+    --gen_name impersonator \
+    --dataset_mode  mi_v2 \
+    --name impersonator_02 \
+    --output_dir  '' \
     --image_size 256  \
     --map_name uv_seg   \
-    --src_path /home/piaozx/liuwen/p300/imgs/3.jpg \
-    --ip http://10.19.126.34 \
-    --port 10087 \
-    --checkpoints_dir /home/piaozx/liuwen/p300/models   \
-    --visual
+    --src_path /public/liuwen/p300/imgs/3.jpg    \
+    --tgt_path /public/liuwen/p300/ImPer/motion_transfer_HD/024/8/2/0695.jpg  --visual \
+    --ip http://10.19.129.76 \
+    --port 10086 \
+    --checkpoints_dir /public/liuwen/p300/models --do_saturate_mask  \
+    --bg_replace
 
 # /home/piaozx/liuwen/p300/imgs/3.jpg
 
