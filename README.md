@@ -52,7 +52,7 @@ python demo_swap.py --gpu_ids 9 \
     --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
     --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
 ```
-![motion imitation](asserts/swap.pdf)
+![appearance transfer](asserts/swap.pdf)
 
 #### Example 3: Novel View Synthesis
 ```
@@ -69,7 +69,7 @@ python demo_view.py --gpu_ids 9 \
     --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
     --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
 ```
-![motion imitation](asserts/novel_view.pdf)
+![novel view](asserts/novel_view.pdf)
 
 ## Citation
 ```
