@@ -46,6 +46,10 @@ class ModelsFactory(object):
             from .viewer import Viewer
             model = Viewer(*args, **kwargs)
 
+        elif model_name == 'viewer_v2':
+            from .viewer_v2 import Viewer
+            model = Viewer(*args, **kwargs)
+
         elif model_name == 'animator':
             from .animator import Animator
             model = Animator(*args, **kwargs)

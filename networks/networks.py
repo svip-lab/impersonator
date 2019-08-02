@@ -205,7 +205,7 @@ class HMRLoss(nn.Module):
 
 
 class FaceLoss(nn.Module):
-    def __init__(self, pretrained_path='pretrains/senet50_ft_weight.pkl'):
+    def __init__(self, pretrained_path='pretrains/sphere20a_20171020.pth'):
         super(FaceLoss, self).__init__()
         if 'senet' in pretrained_path:
             self.net = senet50(include_top=False)

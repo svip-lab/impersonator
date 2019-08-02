@@ -1,3 +1,4 @@
+## AI Docker, impersonator in ICCV
 python demo.py --gpu_ids 9 \
     --model imitator \
     --gen_name impersonator \
@@ -13,7 +14,8 @@ python demo.py --gpu_ids 9 \
     --checkpoints_dir /public/liuwen/p300/models --do_saturate_mask  \
     --bg_replace
 
-python demo_imitator.py --gpu_ids 9 \
+## RTX 01, impersonator v3 (currently works)
+python demo_imitator.py --gpu_ids 0 \
     --model imitator_v2 \
     --gen_name impersonator \
     --name impersonator_mi \
@@ -28,6 +30,4 @@ python demo_imitator.py --gpu_ids 9 \
     --has_detector  --bg_ks 7 --ft_ks 3  --front_warp --post_tune --visual
 
 
-
-3_256.jpg  google1.jpg  ins1.jpg  ins3.jpg  ins5.jpg  ins7.jpg  men1_256.jpg
-8_256.jpg  google2.jpg  ins2.jpg  ins4.jpg  ins6.jpg  ins8.jpg  women1_256.jpg
+3_256.jpg  men1_256.jpg 8_256.jpg  women1_256.jpg
