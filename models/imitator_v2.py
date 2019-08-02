@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn.functional as F
 import numpy as np
+from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
 # from utils.nmr import SMPLRenderer
@@ -24,7 +25,6 @@ class Imitator(BaseModel):
         # prefetch variables
         self.src_info = None
         self.tsf_info = None
-        self.T = None
         self.first_cam = None
 
     def _create_networks(self):
@@ -158,16 +158,19 @@ class Imitator(BaseModel):
         return theta
 
     @torch.no_grad()
-    def inference(self, tgt_paths, tgt_smpls=None, cam_strategy='smooth', output_dir='', visualizer=None):
+    def inference(self, tgt_paths, tgt_smpls=None, cam_strategy='smooth', output_dir='', visualizer=None, verbose=True):
         length = len(tgt_paths)
 
         outputs = []
-        for t in range(length):
+
+        process_bar = tqdm(range(length)) if verbose else range(length)
+
+        for t in process_bar:
             tgt_path = tgt_paths[t]
             tgt_smpl = tgt_smpls[t] if tgt_smpls is not None else None
 
             tsf_inputs = self.transfer_params(tgt_path, tgt_smpl, cam_strategy, t=t)
-            preds = self.forward(tsf_inputs, self.T, visualizer=visualizer)
+            preds = self.forward(tsf_inputs, self.tsf_info['T'])
 
             if visualizer is not None:
                 gt = cv_utils.transform_img(self.tsf_info['image'], image_size=self._opt.image_size, transpose=True)
@@ -184,7 +187,6 @@ class Imitator(BaseModel):
                 cv_utils.save_cv2_img(preds, os.path.join(output_dir, 'pred_' + filename), normalize=True)
                 cv_utils.save_cv2_img(self.tsf_info['image'], os.path.join(output_dir, 'gt_' + filename),
                                       image_size=self._opt.image_size)
-            print('{} / {}'.format(t, length))
 
         return outputs
 
@@ -305,12 +307,11 @@ class Imitator(BaseModel):
         tsf_info['image'] = ori_img
         tsf_info['T'] = T
 
-        self.T = T
         self.tsf_info = tsf_info
 
         return tsf_inputs
 
-    def forward(self, tsf_inputs, T, visualizer=None):
+    def forward(self, tsf_inputs, T):
         bg_img = self.src_info['bg']
         src_encoder_outs, src_resnet_outs = self.src_info['feats']
 
@@ -319,10 +320,6 @@ class Imitator(BaseModel):
 
         if self._opt.front_warp:
             pred_imgs = self.warp_front(pred_imgs, tsf_mask)
-
-        # if visualizer is not None:
-        #     visualizer.vis_named_img('tsf_mask', tsf_mask)
-        #     visualizer.vis_named_img('tsf_color', tsf_color)
 
         return pred_imgs
 
@@ -389,10 +386,6 @@ class Imitator(BaseModel):
                     continue
                 print('\t{}, {:.6f}'.format(key, value.item()))
 
-        # def compute_tv(mat):
-        #     return torch.mean((mat[:, :, :, :-1] - mat[:, :, :, 1:]) ** 2) + \
-        #            torch.mean((mat[:, :, :-1, :] - mat[:, :, 1:, :]) ** 2)
-
         def compute_tv(mat):
             return torch.mean(torch.abs(mat[:, :, :, :-1] - mat[:, :, :, 1:])) + \
                    torch.mean(torch.abs(mat[:, :, :-1, :] - mat[:, :, 1:, :]))
@@ -426,7 +419,7 @@ class Imitator(BaseModel):
 
         self.generator.eval()
 
-    def post_personalize(self, out_dir, data_loader, visualizer):
+    def post_personalize(self, out_dir, data_loader, visualizer, verbose=True):
         from networks.networks import FaceLoss
 
         bg_inpaint = self.src_info['bg']
@@ -436,7 +429,6 @@ class Imitator(BaseModel):
             j2ds = sample['j2d'].cuda()  # (N, 4)
             T = sample['T'].cuda()  # (N, h, w, 2)
             T_cycle = sample['T_cycle'].cuda()  # (N, h, w, 2)
-            T_cycle_vis = sample['T_cycle_vis'].cuda()  # (N, h, w, 2)
             bg_inputs = sample['bg_inputs'].cuda()  # (N, 4, h, w)
             src_inputs = sample['src_inputs'].cuda()  # (N, 6, h, w)
             tsf_inputs = sample['tsf_inputs'].cuda()  # (N, 6, h, w)
@@ -449,7 +441,7 @@ class Imitator(BaseModel):
             pseudo_masks = torch.cat([pseudo_masks[:, 0, ...], pseudo_masks[:, 1, ...]],
                                      dim=0).cuda()  # (2N, 1, h, w)
 
-            return src_fim, tsf_fim, j2ds, T, T_cycle, T_cycle_vis, bg_inputs, \
+            return src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, \
                    src_inputs, tsf_inputs, images, init_preds, pseudo_masks
 
         def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
@@ -511,27 +503,16 @@ class Imitator(BaseModel):
                     continue
                 print('\t{}, {:.6f}'.format(key, value.item()))
 
-        def update_learning_rate(optimizer, current_lr, init_lr, final_lr, nepochs_decay):
-            # updated learning rate G
-            lr_decay = (init_lr - final_lr) / nepochs_decay
-            current_lr -= lr_decay
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = current_lr
-            print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
-            return current_lr
-
         init_lr = 0.0002
-        cur_lr = init_lr
-        final_lr = 0.00001
         nodecay_epochs = 5
-        nepochs_decay = 0
         optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
         face_cri, idt_cri, msk_cri = create_criterion()
 
         step = 0
-        for epoch in range(nodecay_epochs + nepochs_decay):
+        logger = tqdm(range(nodecay_epochs))
+        for epoch in logger:
             for i, sample in enumerate(data_loader):
-                src_fim, tsf_fim, j2ds, T, T_cycle, T_cycle_vis, bg_inputs, src_inputs, tsf_inputs, \
+                src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, src_inputs, tsf_inputs, \
                 images, init_preds, pseudo_masks = set_gen_inputs(sample)
 
                 # print(bg_inputs.shape, src_inputs.shape, tsf_inputs.shape)
@@ -563,16 +544,22 @@ class Imitator(BaseModel):
                 loss.backward()
                 optimizer.step()
 
-                print_losses(epoch=epoch, step=step, total=loss, cyc=cycle_loss,
-                             str=struct_loss, fid=fid_loss, msk=mask_loss)
+                # print_losses(epoch=epoch, step=step, total=loss, cyc=cycle_loss,
+                #              str=struct_loss, fid=fid_loss, msk=mask_loss)
 
-                if step % 10 == 0:
-                    self.visualize(visualizer, input_imgs=images, tsf_imgs=fake_tsf_imgs,
-                                   cyc_imgs=cycle_tsf_imgs, fake_tsf_mask=fake_tsf_mask)
+                if verbose:
+                    logger.set_description(
+                        (
+                            f'epoch: {epoch + 1}; step: {step}; '
+                            f'total: {loss.item():.6f}; cyc: {cycle_loss.item():.6f}; '
+                            f'str: {struct_loss.item():.6f}; fid: {fid_loss.item():.6f}; '
+                            f'msk: {mask_loss.item():.6f}'
+                        )
+                    )
+
+                if verbose and step % 5 == 0:
+                    self.visualize(visualizer, input_imgs=images, tsf_imgs=fake_tsf_imgs, cyc_imgs=cycle_tsf_imgs)
 
                 step += 1
-
-            # if epoch > nodecay_epochs:
-            #     cur_lr = update_learning_rate(optimizer, cur_lr, init_lr, final_lr, nepochs_decay)
 
         self.generator.eval()

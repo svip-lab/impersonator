@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
 # from utils.nmr import SMPLRenderer
@@ -212,10 +213,10 @@ class Swapper(BaseModel):
         left_ids = [i for i in self.PART_IDS['all'] if i not in selected_ids]
 
         src_part_mask = (torch.sum(src_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
-        tgt_part_mask = (torch.sum(tgt_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
+        # tgt_part_mask = (torch.sum(tgt_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
         src_left_mask = torch.sum(src_info['part'][:, left_ids, ...], dim=1).byte()
 
-        selected_faces = merge_list(selected_ids)
+        # selected_faces = merge_list(selected_ids)
         left_faces = merge_list(left_ids)
 
         T11, T21 = self.calculate_trans(src_left_mask, left_faces)
@@ -233,24 +234,7 @@ class Swapper(BaseModel):
             preds = self.warp(preds, tsf_img, src_info['fim'], tsf_mask)
 
         if visualizer is not None:
-            self.visualize(visualizer, pred_img=preds, tsf_mask=tsf_mask)
-            # self.visualize(visualizer, src_part_mask=src_part_mask, src_left_mask=src_left_mask,
-            #                tsf21=tsf21, tsf11=tsf11,
-            #                tsf_img=tsf_img, pred_img=preds,
-            #                src_img=src_info['img'], tgt_img=tgt_info['img'],
-            #                src_cond=src_info['cond'], tsf_cond=tgt_info['cond'])
-            #
-            # src_cond_left = torch.zeros_like(src_info['cond'])
-            # src_cond_left[:, 2, :, :] = 1.0
-            # src_cond_mask = src_cond_left.clone()
-            # tgt_cond_mask = src_cond_left.clone()
-            #
-            # src_cond_left[0, :, src_left_mask[0]] = src_info['cond'][0, :, src_left_mask[0]]
-            # src_cond_mask[0, :, src_part_mask[0]] = src_info['cond'][0, :, src_part_mask[0]]
-            # tgt_cond_mask[0, :, tgt_part_mask[0]] = tgt_info['cond'][0, :, tgt_part_mask[0]]
-            #
-            # self.visualize(visualizer, src_cond_left=src_cond_left, src_cond_mask=src_cond_mask,
-            #                tgt_cond_mask=tgt_cond_mask, bg=src_info['bg'])
+            self.visualize(visualizer, src_img=src_info['img'], tgt_img=tgt_info['img'], preds=preds)
 
         return preds
 
@@ -286,7 +270,7 @@ class Swapper(BaseModel):
 
         return pred_imgs, tsf_mask
 
-    def post_personalize(self, out_dir, visualizer):
+    def post_personalize(self, out_dir, visualizer, verbose=True):
         from networks.networks import FaceLoss
         init_bg = torch.cat([self.src_info['bg'], self.tsf_info['bg']], dim=0)
 
@@ -395,7 +379,7 @@ class Swapper(BaseModel):
             current_lr -= lr_decay
             for param_group in optimizer.param_groups:
                 param_group['lr'] = current_lr
-            print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
+            # print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
             return current_lr
 
         init_lr = 0.0002
@@ -411,7 +395,8 @@ class Swapper(BaseModel):
             src_info=self.src_info, tsf_info=self.tsf_info
         )
 
-        for step in range(total_iters):
+        logger = tqdm(range(total_iters))
+        for step in logger:
 
             fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(
                 src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
@@ -445,8 +430,18 @@ class Swapper(BaseModel):
             loss.backward()
             optimizer.step()
 
-            print_losses(step=step, total=loss, cyc=cycle_loss,
-                         str=struct_loss, fid=fid_loss, msk=mask_loss)
+            # print_losses(step=step, total=loss, cyc=cycle_loss,
+            #              str=struct_loss, fid=fid_loss, msk=mask_loss)
+
+            if verbose:
+                logger.set_description(
+                    (
+                        f'step: {step}; '
+                        f'total: {loss.item():.6f}; cyc: {cycle_loss.item():.6f}; '
+                        f'str: {struct_loss.item():.6f}; fid: {fid_loss.item():.6f}; '
+                        f'msk: {mask_loss.item():.6f}'
+                    )
+                )
 
             if step % 10 == 0:
                 self.visualize(visualizer, input_imgs=src_imgs, tsf_imgs=fake_tsf_imgs,

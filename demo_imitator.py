@@ -3,6 +3,7 @@ import torch.nn
 import torch.utils.data
 import torch.nn.functional as F
 import numpy as np
+from tqdm import tqdm
 import cv2
 import os
 import glob
@@ -43,10 +44,10 @@ def write_pair_info(src_info, tsf_info, out_file, imitator, only_vis):
     T_cycle = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
     pair_data['T_cycle'] = T_cycle[0].cpu().numpy()
 
-    back_face_ids = mesh.get_part_face_ids(part_type='head_back')
-    tsf_p2verts[:, back_face_ids] = -2
-    T_cycle_vis = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
-    pair_data['T_cycle_vis'] = T_cycle_vis[0].cpu().numpy()
+    # back_face_ids = mesh.get_part_face_ids(part_type='head_back')
+    # tsf_p2verts[:, back_face_ids] = -2
+    # T_cycle_vis = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
+    # pair_data['T_cycle_vis'] = T_cycle_vis[0].cpu().numpy()
 
     # for key, val in pair_data.items():
     #     print(key, val.shape)
@@ -54,11 +55,11 @@ def write_pair_info(src_info, tsf_info, out_file, imitator, only_vis):
     write_pickle_file(out_file, pair_data)
 
 
-def scan_tgt_paths(tgt_path):
+def scan_tgt_paths(tgt_path, itv=20):
     if os.path.isdir(tgt_path):
         all_tgt_paths = glob.glob(os.path.join(tgt_path, '*'))
         all_tgt_paths.sort()
-        all_tgt_paths = all_tgt_paths[::20]
+        all_tgt_paths = all_tgt_paths[::itv]
     else:
         all_tgt_paths = [tgt_path]
 
@@ -68,14 +69,16 @@ def scan_tgt_paths(tgt_path):
 def meta_imitate(opt, imitator, prior_tgt_path, save_imgs=True, visualizer=None):
     src_path = opt.src_path
 
-    all_tgt_paths = scan_tgt_paths(prior_tgt_path)
+    all_tgt_paths = scan_tgt_paths(prior_tgt_path, itv=40)
     output_dir = opt.output_dir
 
     out_img_dir, out_pair_dir = mkdirs([os.path.join(output_dir, 'imgs'), os.path.join(output_dir, 'pairs')])
 
     img_pair_list = []
-    for t, tgt_path in enumerate(all_tgt_paths):
-        preds = imitator.inference([tgt_path], visualizer=visualizer, cam_strategy=opt.cam_strategy)
+
+    for t in tqdm(range(len(all_tgt_paths))):
+        tgt_path = all_tgt_paths[t]
+        preds = imitator.inference([tgt_path], visualizer=visualizer, cam_strategy=opt.cam_strategy, verbose=False)
 
         tgt_name = os.path.split(tgt_path)[-1]
         out_path = os.path.join(out_img_dir, 'pred_' + tgt_name)
@@ -427,14 +430,14 @@ def adaptive_personalize(opt, imitator, visualizer):
     out_img_dir, out_pair_dir = mkdirs([os.path.join(output_dir, 'imgs'), os.path.join(output_dir, 'pairs')])
 
     # TODO check if it has been computed.
+    print('\n\t\t\tPersonalization: meta imitation...')
     imitator.personalize(opt.src_path, visualizer=None)
     meta_imitate(opt, imitator, prior_tgt_path=opt.pri_path, visualizer=None, save_imgs=True)
 
-
     # post tune
+    print('\n\t\t\tPersonalization: meta cycle finetune...')
     loader = make_dataset(opt)
-    imitator.personalize(src_path=opt.src_path)
-    imitator.post_personalize(opt.output_dir, loader, visualizer)
+    imitator.post_personalize(opt.output_dir, loader, visualizer=None, verbose=True)
 
 
 if __name__ == "__main__":
@@ -452,17 +455,19 @@ if __name__ == "__main__":
 
     if test_opt.post_tune:
         adaptive_personalize(test_opt, imitator, visualizer)
-    else:
-        imitator.personalize(test_opt.src_path, visualizer=None)
+
+    imitator.personalize(test_opt.src_path, visualizer=visualizer)
+    print('\n\t\t\tPersonalization: completed...')
 
     if test_opt.output_dir:
         pred_output_dir = mkdir(os.path.join(test_opt.output_dir, 'preds'))
     else:
         pred_output_dir = None
 
-    tgt_paths = scan_tgt_paths(test_opt.tgt_path)
+    print('\n\t\t\tImitating `{}`'.format(test_opt.tgt_path))
+    tgt_paths = scan_tgt_paths(test_opt.tgt_path, itv=1)
     imitator.inference(tgt_paths, tgt_smpls=None, cam_strategy='smooth',
-                       output_dir=pred_output_dir, visualizer=visualizer)
+                       output_dir=pred_output_dir, visualizer=visualizer, verbose=True)
 
 
 

@@ -17,7 +17,8 @@
 #3_256.jpg  google1.jpg  ins1.jpg  ins3.jpg  ins5.jpg  ins7.jpg  men1_256.jpg
 #8_256.jpg  google2.jpg  ins2.jpg  ins4.jpg  ins6.jpg  ins8.jpg  women1_256.jpg
 
-python demo_imitator.py --gpu_ids 9 \
+## RTX 01, impersonator v3 (currently works)
+python demo_imitator.py --gpu_ids 0 \
     --model imitator_v2 \
     --gen_name impersonator \
     --name impersonator_mi \

@@ -1,8 +1,4 @@
-import numpy as np
-import cv2
-import os
-import sys
-
+from tqdm import tqdm
 from models.models import ModelsFactory
 from options.test_options import TestOptions
 from utils.demo_visualizer import MotionImitationVisualizer
@@ -29,9 +25,13 @@ if __name__ == "__main__":
     swapper.swap_setup(src_path, tgt_path)
 
     if opt.post_tune:
-        swapper.post_personalize(opt.output_dir, visualizer=visualizer)
+        print('\n\t\t\tPersonalization: meta cycle finetune...')
+        swapper.post_personalize(opt.output_dir, visualizer=None, verbose=True)
+
+    print('\n\t\t\tPersonalization: completed...')
 
     # if a->b
+    print('\n\t\t\tSwapping: {} wear the clothe of {}...'.format(src_path, tgt_path))
     swapper.swap(src_info=swapper.src_info, tgt_info=swapper.tsf_info, target_part=opt.swap_part, visualizer=visualizer)
     # else b->a
     # swapper.swap(src_info=swapper.tgt_info, tgt_info=swapper.src_info, target_part=opt.swap_part, visualizer=visualizer)
