@@ -9,8 +9,6 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 Python 3.6+ and PyTorch 1.0+.
 ```
 
-**Note**: In some newer PyTorch versions you might see some compilation errors involving AT_ASSERT. In these cases you can use the version of the code that is in the branch *at_assert_fix*. These changes will be merged into master in the near future.
-
 ### Installation
 ```shell
 cd thirdparty/neural_renderer
@@ -39,7 +37,7 @@ python demo_imitator.py --gpu_ids 0 \
     --pri_path /root/poseGANs/meta_train/samples/ref_imgs/1  \
     --has_detector  --bg_ks 7 --ft_ks 3  --front_warp --post_tune --visual
 ```
-![motion imitation](asserts/motion_transfer.pdf)
+![motion imitation](assets/motion_transfer.jpg)
 
 #### Example 2: Appearance Transfer
 
@@ -57,7 +55,7 @@ python demo_swap.py --gpu_ids 9 \
     --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
     --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
 ```
-![appearance transfer](asserts/swap.pdf)
+![appearance transfer](assets/appearance_transfer.jpg)
 
 #### Example 3: Novel View Synthesis
 ```
@@ -74,9 +72,10 @@ python demo_view.py --gpu_ids 9 \
     --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
     --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
 ```
-![novel view](asserts/novel_view.pdf)
+![novel view](assets/novel_view.jpg)
 
 ## Citation
+![thunmbnail](assets/thumbnail.jpg)
 ```
 @InProceedings{lwb2019,
     title={Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance Transfer and Novel View Synthesis},

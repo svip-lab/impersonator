@@ -199,7 +199,7 @@ class Imitator(BaseModel):
             tgt_smpl = tgt_smpls[t] if tgt_smpls is not None else None
 
             tsf_inputs = self.transfer_params_by_smpl(tgt_smpl, cam_strategy, t=t)
-            preds = self.forward(tsf_inputs, self.T, visualizer=visualizer)
+            preds = self.forward(tsf_inputs, self.T)
 
             if visualizer is not None:
                 gt = cv_utils.transform_img(self.tsf_info['image'], image_size=self._opt.image_size, transpose=True)

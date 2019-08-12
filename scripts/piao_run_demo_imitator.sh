@@ -18,7 +18,7 @@
 #8_256.jpg  google2.jpg  ins2.jpg  ins4.jpg  ins6.jpg  ins8.jpg  women1_256.jpg
 
 ## RTX 01, impersonator v3 (currently works)
-python demo_imitator.py --gpu_ids 0 \
+python piao_demo_imitator.py --gpu_ids 0 \
     --model imitator_v2 \
     --gen_name impersonator \
     --name impersonator_mi \
@@ -30,7 +30,5 @@ python demo_imitator.py --gpu_ids 0 \
     --src_path meta_train/samples/all_img/men1_256.jpg    \
     --tgt_path meta_train/samples/ref_imgs/2  \
     --pri_path meta_train/samples/ref_imgs/1  \
-    --has_detector  --bg_ks 7 --ft_ks 3  \
-    --front_warp \
-    --visual
+    --has_detector  --bg_ks 7 --ft_ks 3
 

@@ -3,6 +3,7 @@ import torch.nn
 import torch.utils.data
 import torch.nn.functional as F
 import numpy as np
+from tqdm import tqdm
 import cv2
 import os
 import glob
@@ -14,7 +15,6 @@ from utils.demo_visualizer import MotionImitationVisualizer
 from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_head_bbox
 import utils.cv_utils as cv_utils
 import utils.mesh as mesh
-import ipdb
 import pickle
 from tools.video import make_video
 
@@ -46,10 +46,10 @@ def write_pair_info(src_info, tsf_info, out_file, imitator, only_vis):
     T_cycle = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
     pair_data['T_cycle'] = T_cycle[0].cpu().numpy()
 
-    back_face_ids = mesh.get_part_face_ids(part_type='head_back')
-    tsf_p2verts[:, back_face_ids] = -2
-    T_cycle_vis = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
-    pair_data['T_cycle_vis'] = T_cycle_vis[0].cpu().numpy()
+    # back_face_ids = mesh.get_part_face_ids(part_type='head_back')
+    # tsf_p2verts[:, back_face_ids] = -2
+    # T_cycle_vis = imitator.render.cal_bc_transform(tsf_p2verts, src_info['fim'], src_info['wim'])
+    # pair_data['T_cycle_vis'] = T_cycle_vis[0].cpu().numpy()
 
     # for key, val in pair_data.items():
     #     print(key, val.shape)
@@ -57,11 +57,11 @@ def write_pair_info(src_info, tsf_info, out_file, imitator, only_vis):
     write_pickle_file(out_file, pair_data)
 
 
-def scan_tgt_paths(tgt_path):
+def scan_tgt_paths(tgt_path, itv=20):
     if os.path.isdir(tgt_path):
         all_tgt_paths = glob.glob(os.path.join(tgt_path, '*'))
         all_tgt_paths.sort()
-        all_tgt_paths = all_tgt_paths[::20]
+        all_tgt_paths = all_tgt_paths[::itv]
     else:
         all_tgt_paths = [tgt_path]
 
@@ -71,14 +71,16 @@ def scan_tgt_paths(tgt_path):
 def meta_imitate(opt, imitator, prior_tgt_path, save_imgs=True, visualizer=None):
     src_path = opt.src_path
 
-    all_tgt_paths = scan_tgt_paths(prior_tgt_path)
+    all_tgt_paths = scan_tgt_paths(prior_tgt_path, itv=40)
     output_dir = opt.output_dir
 
     out_img_dir, out_pair_dir = mkdirs([os.path.join(output_dir, 'imgs'), os.path.join(output_dir, 'pairs')])
 
     img_pair_list = []
-    for t, tgt_path in enumerate(all_tgt_paths):
-        preds = imitator.inference([tgt_path], visualizer=visualizer, cam_strategy=opt.cam_strategy)
+
+    for t in tqdm(range(len(all_tgt_paths))):
+        tgt_path = all_tgt_paths[t]
+        preds = imitator.inference([tgt_path], visualizer=visualizer, cam_strategy=opt.cam_strategy, verbose=False)
 
         tgt_name = os.path.split(tgt_path)[-1]
         out_path = os.path.join(out_img_dir, 'pred_' + tgt_name)
@@ -128,10 +130,9 @@ class PairSampleDataset(DatasetBase):
         self._dataset_size = 0
         self._sample_files = []
 
-        pair_ids_filename = self._opt.train_ids_file if self._is_for_train else self._opt.test_ids_file
-
+        pair_ids_filepath = self._opt.train_ids_file if self._is_for_train else self._opt.test_ids_file
         # pair_ids_filepath = os.path.join(self._root, pair_ids_filename)
-        pair_ids_filepath = pair_ids_filename
+        # pair_ids_filepath = os.path.join(self._root, pair_ids_filename)
 
         pkl_filename = self._opt.train_pkl_folder if self._is_for_train else self._opt.test_pkl_folder
         pkl_dir = os.path.join(self._root, pkl_filename)
@@ -432,13 +433,14 @@ def adaptive_personalize(opt, imitator, visualizer):
     out_img_dir, out_pair_dir = mkdirs([os.path.join(output_dir, 'imgs'), os.path.join(output_dir, 'pairs')])
 
     # TODO check if it has been computed.
+    print('\n\t\t\tPersonalization: meta imitation...')
     imitator.personalize(opt.src_path, visualizer=None)
     meta_imitate(opt, imitator, prior_tgt_path=opt.pri_path, visualizer=None, save_imgs=True)
 
     # post tune
+    print('\n\t\t\tPersonalization: meta cycle finetune...')
     loader = make_dataset(opt)
-    imitator.personalize(src_path=opt.src_path)
-    imitator.post_personalize(opt.output_dir, loader, visualizer)
+    imitator.post_personalize(opt.output_dir, loader, visualizer=None, verbose=True)
 
 
 def load_mixamo_smpl(mixamo_idx):
@@ -461,6 +463,12 @@ def load_mixamo_smpl(mixamo_idx):
 if __name__ == "__main__":
     # meta imitator
     test_opt = TestOptions().parse()
+    test_opt.front_warp = True
+    test_opt.post_tune = True
+    # test_opt.src_path = '/p300/MI_dataset_new_order/001_1_1/0000.jpg'
+    test_opt.src_path = '/p300/MI_dataset_new_order/009_5_1/000.jpg'
+    test_opt.src_path = 'demo/fashionWOMENDressesid0000271801_4full.jpg'
+    # test_opt.src_path = 'meta_train/samples/all_img/ins6.jpg'
 
     # if test_opt.visual:
     #     visualizer = MotionImitationVisualizer(env=test_opt.name, ip=test_opt.ip, port=test_opt.port)
@@ -470,26 +478,35 @@ if __name__ == "__main__":
     # set imitator
     imitator = ModelsFactory.get_by_name(test_opt.model, test_opt)
 
-    # if test_opt.post_tune:
-    #     adaptive_personalize(test_opt, imitator, visualizer)
-    # else:
-    #     imitator.personalize(test_opt.src_path, visualizer=None)
+
 
     tgt_paths = scan_tgt_paths(test_opt.tgt_path)
     # imitator.personalize(test_opt.src_path, visualizer=None)
 
     if test_opt.output_dir:
-        pred_output_dir = mkdir(os.path.join(test_opt.output_dir, 'mixamo_preds'))
-
+        pred_output_dir = os.path.join(test_opt.output_dir, 'mixamo_preds')
+        os.system("rm -r %s" % pred_output_dir)
+        mkdir(pred_output_dir)
     else:
         pred_output_dir = None
 
     tgt_paths = scan_tgt_paths(test_opt.tgt_path)
     print(pred_output_dir)
-    tgt_smpls = load_mixamo_smpl(26)
+    # tgt_smpls = load_mixamo_smpl(15)
+    # tgt_smpls = load_mixamo_smpl(16)
+    tgt_smpls = load_mixamo_smpl(23)
 
-    # adaptive_personalize(test_opt, imitator, visualizer=None)
-    # imitator.inference_by_smpls(tgt_smpls, cam_strategy='smooth', output_dir=pred_output_dir, visualizer=None)
+    # dance_demo_id = 7
+    # video_info_pkl_path = '/root/impersonator_piao/input_video_data/dance_demo_%d_smooth_hmr_low_pass_smpl.pkl' % dance_demo_id
+    # with open(video_info_pkl_path, 'rb') as f:
+    #     video_info_list = pickle.load(f)
+    # tgt_smpls = [video_info['smpl_param'] for video_info in video_info_list]
+
+    if test_opt.post_tune:
+        adaptive_personalize(test_opt, imitator, visualizer=None)
+    else:
+        imitator.personalize(test_opt.src_path, visualizer=None)
+    imitator.inference_by_smpls(tgt_smpls, cam_strategy='smooth', output_dir=pred_output_dir, visualizer=None)
 
     output_mp4_path = os.path.join(test_opt.output_dir, 'mixamo.mp4')
     img_path_list = sorted(glob.glob('%s/*.jpg' % pred_output_dir))
