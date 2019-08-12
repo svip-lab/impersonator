@@ -182,7 +182,8 @@ class BaseModel(object):
                 state_dict[name] = v
 
             # load params
-            model.load_state_dict(state_dict)
+            # model.load_state_dict(state_dict)
+            model.load_state_dict(state_dict, strict=False)
 
         save_data = torch.load(load_path)
         if need_module:

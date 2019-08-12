@@ -463,9 +463,11 @@ def load_mixamo_smpl(mixamo_idx):
 if __name__ == "__main__":
     # meta imitator
     test_opt = TestOptions().parse()
-    test_opt.front_warp = True
-    test_opt.post_tune = True
+    test_opt.front_warp = False
+    test_opt.post_tune = False
     # test_opt.src_path = '/p300/MI_dataset_new_order/001_1_1/0000.jpg'
+    test_opt.name = 'intrinsic_mixup_hmr'
+    test_opt.checkpoints_dir = 'pretrains/models/deep_fashion_hmr_dp_maxbbox'
     test_opt.src_path = '/p300/MI_dataset_new_order/009_5_1/000.jpg'
     test_opt.src_path = 'demo/fashionWOMENDressesid0000271801_4full.jpg'
     # test_opt.src_path = 'meta_train/samples/all_img/ins6.jpg'
