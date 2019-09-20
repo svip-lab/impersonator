@@ -11,8 +11,8 @@ import glob
 from data.dataset import DatasetBase
 from models.models import ModelsFactory
 from options.test_options import TestOptions
-from utils.demo_visualizer import MotionImitationVisualizer
-from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_head_bbox
+from utils.visdom_visualizer import VisdomVisualizer
+from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_mask_bbox
 import utils.cv_utils as cv_utils
 import utils.mesh as mesh
 
@@ -437,7 +437,7 @@ def adaptive_personalize(opt, imitator, visualizer):
     # post tune
     print('\n\t\t\tPersonalization: meta cycle finetune...')
     loader = make_dataset(opt)
-    imitator.post_personalize(opt.output_dir, loader, visualizer=None, verbose=True)
+    imitator.post_personalize(opt.output_dir, loader, visualizer=None, verbose=False)
 
 
 if __name__ == "__main__":
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     test_opt = TestOptions().parse()
 
     if test_opt.visual:
-        visualizer = MotionImitationVisualizer(env=test_opt.name, ip=test_opt.ip, port=test_opt.port)
+        visualizer = VisdomVisualizer(env=test_opt.name, ip=test_opt.ip, port=test_opt.port)
     else:
         visualizer = None
 

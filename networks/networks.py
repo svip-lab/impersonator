@@ -30,6 +30,10 @@ class NetworksFactory(object):
             from .discriminator import PatchDiscriminator
             network = PatchDiscriminator(*args, **kwargs)
 
+        elif network_name == 'global_local':
+            from .discriminator import GlobalLocalDiscriminator
+            network = GlobalLocalDiscriminator(*args, **kwargs)
+
         else:
             raise ValueError("Network %s not recognized." % network_name)
 
@@ -223,23 +227,32 @@ class FaceLoss(nn.Module):
         # from utils.demo_visualizer import MotionImitationVisualizer
         # self._visualizer = MotionImitationVisualizer('debug', ip='http://10.10.10.100', port=31102)
 
-    def forward(self, imgs1, imgs2, kps1=None, kps2=None):
+    def forward(self, imgs1, imgs2, kps1=None, kps2=None, bbox1=None, bbox2=None):
         """
-        :param imgs1:
-        :param imgs2:
-        :param kps1:
-        :param kps2:
-        :return:
+        Args:
+            imgs1:
+            imgs2:
+            kps1:
+            kps2:
+            bbox1:
+            bbox2:
+
+        Returns:
+
         """
         if kps1 is not None:
-            head_imgs1 = self.crop_resize_head(imgs1, kps1)
+            head_imgs1 = self.crop_head_kps(imgs1, kps1)
+        elif bbox1 is not None:
+            head_imgs1 = self.crop_head_bbox(imgs1, bbox1)
         elif self.check_need_resize(imgs1):
             head_imgs1 = F.interpolate(imgs1, size=(self.height, self.width), mode='bilinear', align_corners=True)
         else:
             head_imgs1 = imgs1
 
         if kps2 is not None:
-            head_imgs2 = self.crop_resize_head(imgs2, kps2)
+            head_imgs2 = self.crop_head_kps(imgs2, kps2)
+        elif bbox2 is not None:
+            head_imgs2 = self.crop_head_bbox(imgs2, bbox2)
         elif self.check_need_resize(imgs2):
             head_imgs2 = F.interpolate(imgs1, size=(self.height, self.width), mode='bilinear', align_corners=True)
         else:
@@ -254,6 +267,7 @@ class FaceLoss(nn.Module):
         # self._visualizer.vis_named_img('head imgs1', head_imgs1)
         # import ipdb
         # ipdb.set_trace()
+
         return loss
 
     def compute_loss(self, img1, img2):
@@ -274,7 +288,29 @@ class FaceLoss(nn.Module):
     def check_need_resize(self, img):
         return img.shape[2] != self.height or img.shape[3] != self.width
 
-    def crop_resize_head(self, imgs, kps):
+    def crop_head_bbox(self, imgs, bboxs):
+        """
+        Args:
+            bboxs: (N, 4), 4 = [lt_x, lt_y, rt_x, rt_y]
+
+        Returns:
+            resize_image:
+        """
+        bs, _, ori_h, ori_w = imgs.shape
+
+        head_imgs = []
+
+        for i in range(bs):
+            min_x, max_x, min_y, max_y = bboxs[i]
+            head = imgs[i:i+1, :, min_y:max_y, min_x:max_x]  # (1, c, h', w')
+            head = F.interpolate(head, size=(self.height, self.width), mode='bilinear', align_corners=True)
+            head_imgs.append(head)
+
+        head_imgs = torch.cat(head_imgs, dim=0)
+
+        return head_imgs
+
+    def crop_head_kps(self, imgs, kps):
         """
         :param imgs: (N, C, H, W)
         :param kps: (N, 19, 2)
@@ -286,7 +322,7 @@ class FaceLoss(nn.Module):
         head_imgs = []
 
         for i in range(bs):
-            min_x, max_x, min_y, max_y = rects[i].detach()
+            min_x, max_x, min_y, max_y = rects[i]
             head = imgs[i:i+1, :, min_y:max_y, min_x:max_x]  # (1, c, h', w')
             head = F.interpolate(head, size=(self.height, self.width), mode='bilinear', align_corners=True)
             head_imgs.append(head)

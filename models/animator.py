@@ -7,8 +7,6 @@ from utils.nmr import SMPLRenderer
 from utils.util import to_tensor
 import utils.cv_utils as cv_utils
 
-import ipdb
-
 
 class Animator(BaseModel):
 

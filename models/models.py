@@ -30,33 +30,18 @@ class ModelsFactory(object):
             from .imitator import Imitator
             model = Imitator(*args, **kwargs)
 
-        elif model_name == 'imitator_v2':
-            from .imitator_v2 import Imitator
-            model = Imitator(*args, **kwargs)
-
         elif model_name == 'swapper':
             from .swapper import Swapper
-            model = Swapper(*args, **kwargs)
-
-        elif model_name == 'swapper_v2':
-            from .swapper_v2 import Swapper
             model = Swapper(*args, **kwargs)
 
         elif model_name == 'viewer':
             from .viewer import Viewer
             model = Viewer(*args, **kwargs)
 
-        elif model_name == 'viewer_v2':
-            from .viewer_v2 import Viewer
-            model = Viewer(*args, **kwargs)
-
         elif model_name == 'animator':
-            from .animator import Animator
-            model = Animator(*args, **kwargs)
-
-        elif model_name == 'impersonator_02':
-            from .impersonator_2 import Impersonator
-            model = Impersonator(*args, **kwargs)
+            raise NotImplementedError
+            # from .animator import Animator
+            # model = Animator(*args, **kwargs)
 
         elif model_name == 'impersonator_trainer':
             from .impersonator_trainer import Impersonator
@@ -65,6 +50,10 @@ class ModelsFactory(object):
         elif model_name == 'impersonator_trainer_aug':
             from .impersonator_trainer_aug import Impersonator
             model = Impersonator(*args, **kwargs)
+
+        elif model_name == 'impersonator_all_set_trainer_aug':
+            from .impersonator_trainer_aug import ImpersonatorAllSetTrain
+            model = ImpersonatorAllSetTrain(*args, **kwargs)
 
         else:
             raise ValueError("Model %s not recognized." % model_name)

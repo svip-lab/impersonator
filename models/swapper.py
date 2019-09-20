@@ -1,11 +1,15 @@
 import os
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
+# from utils.nmr import SMPLRenderer
+from utils.detectors import PersonMaskRCNNDetector
 from utils.nmr import SMPLRenderer
-from utils.util import to_tensor
 import utils.cv_utils as cv_utils
+import utils.util as util
+import utils.mesh as mesh
 
 import ipdb
 
@@ -14,9 +18,6 @@ class Swapper(BaseModel):
 
     PART_IDS = {
         'body': [1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'upper_body': [1, 2, 3, 4, 9],
-        'lower_body': [4, 5],
-        'torso': [9],
         'all': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     }
 
@@ -24,31 +25,51 @@ class Swapper(BaseModel):
         super(Swapper, self).__init__(opt)
         self._name = 'Swapper'
 
-        # create networks
-        self._init_create_networks()
+        self._create_networks()
 
         # prefetch variables
         self.src_info = None
         self.tsf_info = None
+        self.T = None
+        self.T12 = None
+        self.T21 = None
+        self.grid = self.render.create_meshgrid(self._opt.image_size).cuda()
+        self.part_fn = torch.tensor(mesh.create_mapping('par', self._opt.uv_mapping,
+                                                        contain_bg=True, fill_back=False)).float().cuda()
+        self.part_faces_dict = mesh.get_part_face_ids(part_type='par', fill_back=False)
+        self.part_faces = list(self.part_faces_dict.values())
 
-        # initialize T
-        self.initial_T = torch.zeros(opt.image_size, opt.image_size, 2, dtype=torch.float32).cuda() - 1.0
-        self.initial_T_grid = self._make_grid()
+    def _create_networks(self):
+        # 0. create generator
+        self.generator = self._create_generator().cuda()
 
-    def _make_grid(self):
-        # initialize T
-        image_size = self._opt.image_size
-        xy = torch.arange(0, image_size, dtype=torch.float32) / (image_size - 1) * 2 - 1.0
-        grid_y, grid_x = torch.meshgrid(xy, xy)
+        # 0. create bgnet
+        if self._opt.bg_model:
+            self.bgnet = self._create_bgnet().cuda()
+        else:
+            self.bgnet = self.generator.bg_model
 
-        # 1. make mesh grid
-        T = torch.stack([grid_x, grid_y], dim=-1).cuda()  # (image_size, image_size, 2)
+        # 2. create hmr
+        self.hmr = self._create_hmr().cuda()
 
-        return T
+        # 3. create render
+        self.render = SMPLRenderer(image_size=self._opt.image_size, tex_size=self._opt.tex_size,
+                                   has_front=self._opt.front_warp, fill_back=False).cuda()
+        # 4. pre-processor
+        if self._opt.has_detector:
+            self.detector = PersonMaskRCNNDetector(ks=self._opt.bg_ks, threshold=0.5, to_gpu=True)
+        else:
+            self.detector = None
+
+    def _create_bgnet(self):
+        net = NetworksFactory.get_by_name('inpaintor', c_dim=4)
+        self._load_params(net, self._opt.bg_model, need_module=False)
+        net.eval()
+        return net
 
     def _create_generator(self):
         net = NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3+self._G_cond_nc,
-                                          tsf_dim=3+self._G_cond_nc, repeat_num=6).cuda()
+                                          tsf_dim=3+self._G_cond_nc, repeat_num=self._opt.repeat_num)
 
         if self._opt.load_path:
             self._load_params(net, self._opt.load_path)
@@ -61,26 +82,90 @@ class Swapper(BaseModel):
         net.eval()
         return net
 
-    def _create_mesh_model(self):
-        hmr = HumanModelRecovery(smpl_pkl_path=self._opt.smpl_model).cuda()
+    def _create_hmr(self):
+        hmr = HumanModelRecovery(self._opt.smpl_model)
         saved_data = torch.load(self._opt.hmr_model)
         hmr.load_state_dict(saved_data)
-
         hmr.eval()
-        print('load hmr model from {}'.format(self._opt.hmr_model))
         return hmr
 
-    def _create_render(self, faces):
-        render = SMPLRenderer(faces=faces, map_name=self._opt.map_name, uv_map_path=self._opt.uv_mapping,
-                              tex_size=self._opt.tex_size, image_size=self._opt.image_size, fill_back=True,
-                              anti_aliasing=True, background_color=(0, 0, 0), has_front_map=True).cuda()
-        return render
+    @staticmethod
+    def visualize(*args, **kwargs):
+        visualizer = args[0]
+        if visualizer is not None:
+            for key, value in kwargs.items():
+                visualizer.vis_named_img(key, value)
 
-    def _init_create_networks(self):
-        # generator network
-        self.model = self._create_generator()
-        self.hmr = self._create_mesh_model()
-        self.render = self._create_render(self.hmr.smpl.faces)
+    # TODO it dose not support mini-batch inputs currently.
+    @torch.no_grad()
+    def personalize(self, src_path, src_smpl=None, output_path='', visualizer=None):
+
+        ori_img = cv_utils.read_cv2_img(src_path)
+
+        # resize image and convert the color space from [0, 255] to [-1, 1]
+        img = cv_utils.transform_img(ori_img, self._opt.image_size, transpose=True) * 2 - 1.0
+        img = torch.tensor(img, dtype=torch.float32).cuda()[None, ...]
+
+        if src_smpl is None:
+            img_hmr = cv_utils.transform_img(ori_img, 224, transpose=True) * 2 - 1.0
+            img_hmr = torch.tensor(img_hmr, dtype=torch.float32).cuda()[None, ...]
+            src_smpl = self.hmr(img_hmr)
+        else:
+            src_smpl = torch.tensor(src_smpl, dtype=torch.float32).cuda()[None, ...]
+
+        # source process, {'theta', 'cam', 'pose', 'shape', 'verts', 'j2d', 'j3d'}
+        src_info = self.hmr.get_details(src_smpl)
+        src_f2verts, src_fim, src_wim = self.render.render_fim_wim(src_info['cam'], src_info['verts'])
+        # src_f2pts = src_f2verts[:, :, :, 0:2]
+        src_info['fim'] = src_fim
+        src_info['wim'] = src_wim
+        src_info['cond'], _ = self.render.encode_fim(src_info['cam'], src_info['verts'], fim=src_fim, transpose=True)
+        src_info['f2verts'] = src_f2verts
+        src_info['p2verts'] = src_f2verts[:, :, :, 0:2]
+        src_info['p2verts'][:, :, :, 1] *= -1
+
+        if self._opt.only_vis:
+            src_info['p2verts'] = self.render.get_vis_f2pts(src_info['p2verts'], src_fim)
+
+        src_info['part'], _ = self.render.encode_fim(src_info['cam'], src_info['verts'],
+                                                     fim=src_fim, transpose=True, map_fn=self.part_fn)
+        # add image to source info
+        src_info['img'] = img
+        src_info['image'] = ori_img
+
+        # 2. process the src inputs
+        if self.detector is not None:
+            bbox, body_mask = self.detector.inference(img[0])
+            bg_mask = 1 - body_mask
+        else:
+            bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
+            body_mask = 1 - bg_mask
+
+        if self._opt.bg_model:
+            src_info['bg'] = self.bgnet(img, masks=body_mask, only_x=True)
+        else:
+            incomp_img = img * bg_mask
+            bg_inputs = torch.cat([incomp_img, bg_mask], dim=1)
+            img_bg = self.bgnet(bg_inputs)
+            src_info['bg_inputs'] = bg_inputs
+            # src_info['bg'] = img_bg
+            src_info['bg'] = incomp_img + img_bg * body_mask
+
+        ft_mask = 1 - util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.ft_ks, mode='erode')
+        src_inputs = torch.cat([img * ft_mask, src_info['cond']], dim=1)
+
+        src_info['feats'] = self.generator.encode_src(src_inputs)
+        src_info['src_inputs'] = src_inputs
+
+        src_info = src_info
+
+        # if visualizer is not None:
+        #     self.visualize(visualizer, src=img, bg=src_info['bg'])
+
+        if output_path:
+            cv_utils.save_cv2_img(src_info['image'], output_path, image_size=self._opt.image_size)
+
+        return src_info
 
     def _extract_smpls(self, input_file):
         img = cv_utils.read_cv2_img(input_file)
@@ -91,6 +176,7 @@ class Swapper(BaseModel):
 
         return theta
 
+    @torch.no_grad()
     def swap_smpl(self, src_cam, src_shape, tgt_smpl, preserve_scale=True):
         cam = tgt_smpl[:, 0:3].contiguous()
         pose = tgt_smpl[:, 3:75].contiguous()
@@ -106,239 +192,266 @@ class Swapper(BaseModel):
 
         return tsf_smpl
 
+    @torch.no_grad()
     def swap_setup(self, src_path, tgt_path, src_smpl=None, tgt_smpl=None, output_dir=''):
+        self.src_info = self.personalize(src_path, src_smpl)
+        self.tsf_info = self.personalize(tgt_path, tgt_smpl)
 
-        with torch.no_grad():
-            self.src_info = self.personalize(src_path, src_smpl)
-            self.tsf_info = self.personalize(tgt_path, tgt_smpl)
+    @torch.no_grad()
+    def swap(self, src_info, tgt_info, target_part='body', visualizer=None):
+        assert target_part in self.PART_IDS.keys()
 
-    def swap_preview(self, src_info, tgt_info, target_part='lower_body', visualizer=None):
-        with torch.no_grad():
-            assert target_part in self.PART_IDS.keys()
+        def merge_list(part_ids):
+            faces = set()
+            for i in part_ids:
+                fs = set(self.part_faces[i])
+                faces |= fs
+            return list(faces)
 
-            # get target selected face index map
-            part_id = self.PART_IDS[target_part]
-            part_mask = torch.sum(tgt_info['part'][:, part_id, ...], dim=1).byte()
+        # get target selected face index map
+        selected_ids = self.PART_IDS[target_part]
+        left_ids = [i for i in self.PART_IDS['all'] if i not in selected_ids]
 
-            selected_fids = tgt_info['fim'][part_mask].unique().long()
-            front_selected_fids = selected_fids[selected_fids < self.render.base_nf]
-            back_selected_fids = selected_fids[selected_fids >= self.render.base_nf]
+        src_part_mask = (torch.sum(src_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
+        # tgt_part_mask = (torch.sum(tgt_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
+        src_left_mask = torch.sum(src_info['part'][:, left_ids, ...], dim=1).byte()
 
-            # left id
-            left_ids = [i for i in self.PART_IDS['all'] if i not in part_id]
-            left_part_mask = torch.sum(src_info['part'][:, left_ids, ...], dim=1).byte()
+        # selected_faces = merge_list(selected_ids)
+        left_faces = merge_list(left_ids)
 
-            # fill back
-            all_selected_fids = torch.cat([selected_fids, front_selected_fids + self.render.base_nf,
-                                           back_selected_fids - self.render.base_nf], dim=0)
+        T11, T21 = self.calculate_trans(src_left_mask, left_faces)
 
-            # copy target selected part face into source
-            tsf_tex = src_info['tex'].clone()
-            tsf_tex[0, all_selected_fids, ...] = tgt_info['tex'][0, all_selected_fids, ...]
+        tsf21 = self.generator.transform(tgt_info['img'], T21)
+        tsf11 = self.generator.transform(src_info['img'], T11)
 
-            # render tsf image
-            tsf_img, _ = self.render.render(src_info['cam'], src_info['verts'], tsf_tex, reverse_yz=True, get_fim=False)
-            tsf_inputs = torch.cat([tsf_img, src_info['cond']], dim=1)
+        tsf_img = tsf21 * (src_part_mask[:, None, :, :].float()) + tsf11 * (src_left_mask[:, None, :, :].float())
 
-            ipdb.set_trace()
+        tsf_inputs = torch.cat([tsf_img, src_info['cond']], dim=1)
 
-            # part_mask = left_part_mask
-            self.T12 = self.calculate_trans(tgt_info['bc_f2pts'], src_info['fim'], tgt_info['fim'], part_mask)
-            self.T21 = self.calculate_trans(src_info['bc_f2pts'], tgt_info['fim'], src_info['fim'], left_part_mask)
+        preds, tsf_mask = self.forward(tsf_inputs, tgt_info['feats'], T21, src_info['feats'], T11, src_info['bg'])
 
-            tsf12 = self.model.transform(tgt_info['image'], self.T21)
-            tsf21 = self.model.transform(src_info['image'], self.T12)
+        if self._opt.front_warp:
+            preds = self.warp(preds, tsf_img, src_info['fim'], tsf_mask)
 
-            visualizer.vis_named_img('tsf12', tsf12)
-            visualizer.vis_named_img('tsf21', tsf21)
+        if visualizer is not None:
+            self.visualize(visualizer, src_img=src_info['img'], tgt_img=tgt_info['img'], preds=preds)
 
-            # front net
-            pred_imgs = self.forward(tsf_inputs, tgt_info['feats'], src_info['feats'],
-                                     self.T12, self.T21, src_info['bg'])
-            # pred_imgs = self.auto_encoder(tsf_inputs, src_info['bg'])
+        return preds
 
-            if visualizer is not None:
-                visualizer.vis_named_img('tsf_img', tsf_img)
-                visualizer.vis_named_img('pred_img', pred_imgs)
-                visualizer.vis_named_img('part_mask', part_mask)
+    # TODO it dose not support mini-batch inputs currently.
+    def calculate_trans(self, src_left_mask, left_faces):
+        # calculate T11
+        T11 = self.grid.clone()
+        T11[~src_left_mask[0]] = -2
+        T11.unsqueeze_(0)
 
-            return pred_imgs
+        # calculate T21
+        tsf_f2p = self.tsf_info['p2verts'].clone()
+        tsf_f2p[0, left_faces] = -2
+        T21 = self.render.cal_bc_transform(tsf_f2p, self.src_info['fim'], self.src_info['wim'])
+        T21.clamp_(-2, 2)
+        return T11, T21
 
-    def swap(self, src_info, tgt_info, target_part='lower_body', visualizer=None):
-        with torch.no_grad():
-            assert target_part in self.PART_IDS.keys()
+    def warp(self, preds, tsf, fim, fake_tsf_mask):
+        front_mask = self.render.encode_front_fim(fim, transpose=True)
+        preds = (1 - front_mask) * preds + tsf * front_mask * (1 - fake_tsf_mask)
+        # preds = torch.clamp(preds + tsf * front_mask, -1, 1)
+        return preds
 
-            # get target selected face index map
-            selected_part_id = self.PART_IDS[target_part]
-            left_id = [i for i in self.PART_IDS['all'] if i not in selected_part_id]
-
-            src_part_mask = (torch.sum(src_info['part'][:, selected_part_id, ...], dim=1) != 0).byte()
-            tgt_part_mask = (torch.sum(tgt_info['part'][:, selected_part_id, ...], dim=1) != 0).byte()
-            src_left_mask = torch.sum(src_info['part'][:, left_id, ...], dim=1).byte()
-
-            T11, T21, T = self.calculate_trans(tgt_info['bc_f2pts'], src_info['fim'], tgt_info['fim'], src_part_mask, src_left_mask)
-
-            tsf21 = self.model.transform(tgt_info['image'], T21)
-            tsf11 = self.model.transform(src_info['image'], T11)
-
-            tsf_img = tsf21 * (src_part_mask[:, None, :, :].float()) + tsf11 * (src_left_mask[:, None, :, :].float())
-
-            # tsf_img = torch.zeros_like(tsf21)
-            # tsf_img[0, :, src_part_mask[0]] = tsf21[0, :, src_part_mask[0]]
-            # tsf_img[0, :, src_left_mask[0]] = tsf11[0, :, src_left_mask[0]]
-
-            tsf_inputs = torch.cat([tsf_img, src_info['cond']], dim=1)
-            # feats = self.model.src_model.inference(tsf_inputs)
-            # preds = self.forward(tsf_inputs, feats, T, src_info['bg'])
-
-            preds = self.forward2(tsf_inputs, tgt_info['feats'], T21, src_info['feats'], T11, src_info['bg'])
-
-            if visualizer is not None:
-                visualizer.vis_named_img('src_part_mask', src_part_mask)
-                visualizer.vis_named_img('src_left_mask', src_left_mask)
-                visualizer.vis_named_img('tgt_part_mask', tgt_part_mask)
-                visualizer.vis_named_img('tsf21', tsf21)
-                visualizer.vis_named_img('tsf11', tsf11)
-                visualizer.vis_named_img('tsf_img', tsf_img)
-                visualizer.vis_named_img('pred_img', preds)
-                visualizer.vis_named_img('src_img', src_info['image'])
-                visualizer.vis_named_img('tgt_img', tgt_info['image'])
-                visualizer.vis_named_img('src_cond', src_info['cond'])
-                visualizer.vis_named_img('tsf_cond', tgt_info['cond'])
-
-                src_cond_left = torch.zeros_like(src_info['cond'])
-                src_cond_left[:, 2, :, :] = 1.0
-                src_cond_mask = src_cond_left.clone()
-                tgt_cond_mask = src_cond_left.clone()
-
-                src_cond_left[0, :, src_left_mask[0]] = src_info['cond'][0, :, src_left_mask[0]]
-                src_cond_mask[0, :, src_part_mask[0]] = src_info['cond'][0, :, src_part_mask[0]]
-                tgt_cond_mask[0, :, tgt_part_mask[0]] = tgt_info['cond'][0, :, tgt_part_mask[0]]
-
-                visualizer.vis_named_img('src_cond_left', src_cond_left)
-                visualizer.vis_named_img('src_cond_mask', src_cond_mask)
-                visualizer.vis_named_img('tgt_cond_mask', tgt_cond_mask)
-
-            return preds
-
-    def calculate_trans(self, bc_f2pts, src_fim, tsf_dim, src_part_mask, src_left_mask):
-        bs = tsf_dim.shape[0]
-        grid_T = self.initial_T_grid.clone()
-        T = self.initial_T_grid.repeat(bs, 1, 1, 1)
-        T11 = self.initial_T.repeat(bs, 1, 1, 1)
-        T21 = self.initial_T.repeat(bs, 1, 1, 1)   # (bs, image_size, image_size, 2)
-        for i in range(bs):
-            Ti21 = T21[i]
-            src_i = src_fim[i, src_part_mask[i]].long()
-            # (nf, 2)
-            src_flows = bc_f2pts[i, src_i]      # (nt, 2)
-            Ti21[src_part_mask[i]] = src_flows
-
-            T11[i, src_left_mask[i]] = grid_T[src_left_mask[i]]
-
-        return T11, T21, T
-
-    def get_src_bc_f2pts(self, src_cams, src_verts):
-
-        points = self.render.batch_orth_proj_idrot(src_cams, src_verts)
-        f2pts = self.render.points_to_faces(points)
-        bc_f2pts = self.render.compute_barycenter(f2pts)  # (bs, nf, 2)
-
-        return bc_f2pts
-
-    def personalize(self, src_path, src_smpl=None, ):
-
-        with torch.no_grad():
-            ori_img = cv_utils.read_cv2_img(src_path)
-
-            # resize image and convert the color space from [0, 255] to [-1, 1]
-            img = cv_utils.transform_img(ori_img, self._opt.image_size, transpose=True) * 2 - 1.0
-            img = torch.FloatTensor(img).cuda()[None, ...]
-
-            if src_smpl is None:
-                img_hmr = cv_utils.transform_img(ori_img, 224, transpose=True) * 2 - 1.0
-                img_hmr = torch.FloatTensor(img_hmr).cuda()[None, ...]
-                src_smpl = self.hmr(img_hmr)[-1]
-            else:
-                src_smpl = to_tensor(src_smpl).cuda()[None, ...]
-
-            # source process, {'theta', 'cam', 'pose', 'shape', 'verts', 'j2d', 'j3d'}
-            src_info = self.hmr.get_details(src_smpl)
-
-            # add source bary-center points
-            src_info['bc_f2pts'] = self.get_src_bc_f2pts(src_info['cam'], src_info['verts'])
-
-            # add image to source info
-            src_info['image'] = img
-
-            # add texture into source info
-            _, src_info['tex'] = self.render.forward(src_info['cam'], src_info['verts'],
-                                                     img, is_uv_sampler=False, reverse_yz=True, get_fim=False)
-
-            # add pose condition and face index map into source info
-            src_info['cond'], src_info['fim'] = self.render.encode_fim(src_info['cam'],
-                                                                       src_info['verts'], transpose=True)
-
-            # add part condition into source info
-            src_info['part'] = self.render.encode_front_fim(src_info['fim'], transpose=True)
-
-            # bg input and inpaiting background
-            src_bg_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=15, mode='erode')
-            bg_inputs = torch.cat([img * src_bg_mask, src_bg_mask], dim=1)
-            src_info['bg'] = self.model.bg_model(bg_inputs)
-            #
-            # source identity
-            src_crop_mask = self.morph(src_info['cond'][:, -1:, :, :], ks=3, mode='erode')
-            src_inputs = torch.cat([img * (1 - src_crop_mask), src_info['cond']], dim=1)
-            src_info['feats'] = self.model.src_model.inference(src_inputs)
-            #
-            # self.src_info = src_info
-
-            return src_info
-
-    def morph(self, src_bg_mask, ks, mode='erode'):
-        n_ks = ks ** 2
-        kernel = torch.ones(1, 1, ks, ks, dtype=torch.float32).cuda()
-        out = F.conv2d(src_bg_mask, kernel, padding=ks // 2)
-
-        if mode == 'erode':
-            out = (out == n_ks).float()
-        else:
-            out = (out >= 1).float()
-
-        return out
-
-    def forward(self, tsf_inputs, feats, T, bg):
-        with torch.no_grad():
-            # generate fake images
-            src_encoder_outs, src_resnet_outs = feats
-
-            tsf_color, tsf_mask = self.model.inference(src_encoder_outs, src_resnet_outs, tsf_inputs, T)
-            tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
-            pred_imgs = tsf_mask * bg + (1 - tsf_mask) * tsf_color
-
-        return pred_imgs
-
-    def forward2(self, tsf_inputs, feats21, T21, feats11, T11, bg):
+    def forward(self, tsf_inputs, feats21, T21, feats11, T11, bg):
         with torch.no_grad():
             # generate fake images
             src_encoder_outs21, src_resnet_outs21 = feats21
             src_encoder_outs11, src_resnet_outs11 = feats11
 
-            tsf_color, tsf_mask = self.model.swap(tsf_inputs, src_encoder_outs21, src_encoder_outs11,
-                                                  src_resnet_outs21, src_resnet_outs11, T21, T11)
-            tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
+            tsf_color, tsf_mask = self.generator.swap(tsf_inputs, src_encoder_outs21, src_encoder_outs11,
+                                                      src_resnet_outs21, src_resnet_outs11, T21, T11)
             pred_imgs = tsf_mask * bg + (1 - tsf_mask) * tsf_color
 
-        return pred_imgs
+        return pred_imgs, tsf_mask
 
-    def auto_encoder(self, tsf_inputs, bg_img):
-        with torch.no_grad():
-            tsf_color, tsf_mask = self.model.src_model(tsf_inputs)
-            tsf_mask = self._do_if_necessary_saturate_mask(tsf_mask, saturate=self._opt.do_saturate_mask)
-            pred_imgs = tsf_mask * bg_img + (1 - tsf_mask) * tsf_color
+    def post_personalize(self, out_dir, visualizer, verbose=True):
+        from networks.networks import FaceLoss
+        init_bg = torch.cat([self.src_info['bg'], self.tsf_info['bg']], dim=0)
 
-        return pred_imgs
+        @torch.no_grad()
+        def initialize(src_info, tsf_info):
+            src_encoder_outs, src_resnet_outs = src_info['feats']
+            src_f2p = src_info['p2verts']
 
-    def _do_if_necessary_saturate_mask(self, m, saturate=False):
-        return torch.clamp(0.55*torch.tanh(3*(m-0.5))+0.5, 0, 1) if saturate else m
+            tsf_fim = tsf_info['fim']
+            tsf_wim = tsf_info['wim']
+            tsf_cond = tsf_info['cond']
+
+            T = self.render.cal_bc_transform(src_f2p, tsf_fim, tsf_wim)
+            tsf_img = F.grid_sample(src_info['img'], T)
+            tsf_inputs = torch.cat([tsf_img, tsf_cond], dim=1)
+
+            tsf_color, tsf_mask = self.generator.inference(
+                src_encoder_outs, src_resnet_outs, tsf_inputs, T)
+
+            preds = src_info['bg'] * tsf_mask + tsf_color * (1 - tsf_mask)
+
+            if self._opt.front_warp:
+                preds = self.warp(preds, tsf_img, tsf_fim, tsf_mask)
+
+            return preds, T, tsf_inputs
+
+        @torch.no_grad()
+        def set_inputs(src_info, tsf_info):
+            s2t_init_preds, s2t_T, s2t_tsf_inputs = initialize(src_info, tsf_info)
+            t2s_init_preds, t2s_T, t2s_tsf_inputs = initialize(tsf_info, src_info)
+
+            s2t_j2d = torch.cat([src_info['j2d'], tsf_info['j2d']], dim=0)
+            t2s_j2d = torch.cat([tsf_info['j2d'], src_info['j2d']], dim=0)
+            j2ds = torch.stack([s2t_j2d, t2s_j2d], dim=0)
+
+            init_preds = torch.cat([s2t_init_preds, t2s_init_preds], dim=0)
+            images = torch.cat([src_info['img'], tsf_info['img']], dim=0)
+            T = torch.cat([s2t_T, t2s_T], dim=0)
+            T_cycle = torch.cat([t2s_T, s2t_T], dim=0)
+            tsf_inputs = torch.cat([s2t_tsf_inputs, t2s_tsf_inputs], dim=0)
+            src_fim = torch.cat([src_info['fim'], tsf_info['fim']], dim=0)
+            tsf_fim = torch.cat([tsf_info['fim'], src_info['fim']], dim=0)
+
+            s2t_inputs = src_info['src_inputs']
+            t2s_inputs = tsf_info['src_inputs']
+
+            src_inputs = torch.cat([s2t_inputs, t2s_inputs], dim=0)
+
+            return src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, images, init_preds
+
+        def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
+            # set cycle bg inputs
+            tsf_bg_mask = tsf_inputs[:, -1:, ...]
+
+            # set cycle src inputs
+            cycle_src_inputs = torch.cat([fake_tsf_imgs * tsf_bg_mask, tsf_inputs[:, 3:]], dim=1)
+
+            # set cycle tsf inputs
+            cycle_tsf_img = F.grid_sample(fake_tsf_imgs, T_cycle)
+            cycle_tsf_inputs = torch.cat([cycle_tsf_img, src_inputs[:, 3:]], dim=1)
+
+            return cycle_src_inputs, cycle_tsf_inputs
+
+        def inference(src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
+            fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
+                self.generator.infer_front(src_inputs, tsf_inputs, T=T)
+
+            fake_src_imgs = fake_src_mask * init_bg + (1 - fake_src_mask) * fake_src_color
+            fake_tsf_imgs = fake_tsf_mask * init_bg + (1 - fake_tsf_mask) * fake_tsf_color
+
+            if self._opt.front_warp:
+                fake_tsf_imgs = self.warp(fake_tsf_imgs, tsf_inputs[:, 0:3], tsf_fim, fake_tsf_mask)
+
+            cycle_src_inputs, cycle_tsf_inputs = set_cycle_inputs(
+                fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle)
+
+            cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
+                self.generator.infer_front(cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
+
+            cycle_src_imgs = cycle_src_mask * init_bg + (1 - cycle_src_mask) * cycle_src_color
+            cycle_tsf_imgs = cycle_tsf_mask * init_bg + (1 - cycle_tsf_mask) * cycle_tsf_color
+
+            if self._opt.front_warp:
+                cycle_tsf_imgs = self.warp(cycle_tsf_imgs, src_inputs[:, 0:3], src_fim, fake_src_mask)
+
+            return fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, cycle_tsf_inputs
+
+        def create_criterion():
+            face_criterion = FaceLoss(pretrained_path=self._opt.face_model).cuda()
+            idt_criterion = torch.nn.L1Loss()
+            mask_criterion = torch.nn.BCELoss()
+
+            return face_criterion, idt_criterion, mask_criterion
+
+        def print_losses(*args, **kwargs):
+
+            print('step = {}'.format(kwargs['step']))
+            for key, value in kwargs.items():
+                if key == 'step':
+                    continue
+                print('\t{}, {:.6f}'.format(key, value.item()))
+
+        def update_learning_rate(optimizer, current_lr, init_lr, final_lr, nepochs_decay):
+            # updated learning rate G
+            lr_decay = (init_lr - final_lr) / nepochs_decay
+            current_lr -= lr_decay
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = current_lr
+            # print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
+            return current_lr
+
+        init_lr = 0.0002
+        cur_lr = init_lr
+        final_lr = 0.00001
+        fix_iters = 25
+        total_iters = 50
+        optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
+        face_cri, idt_cri, msk_cri = create_criterion()
+
+        # set up inputs
+        src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, src_imgs, init_preds = set_inputs(
+            src_info=self.src_info, tsf_info=self.tsf_info
+        )
+
+        logger = tqdm(range(total_iters))
+        for step in logger:
+
+            fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(
+                src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
+
+            # cycle reconstruction loss
+            cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)
+
+            # structure loss
+            bg_mask = src_inputs[:, -1:]
+            body_mask = 1.0 - bg_mask
+            str_src_imgs = src_imgs * body_mask
+            cycle_warp_imgs = cycle_tsf_inputs[:, 0:3]
+            # back_head_mask = 1 - self.render.encode_front_fim(tsf_fim, transpose=True, front_fn=False)
+            # struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
+            #               2 * idt_cri(str_src_imgs * back_head_mask, cycle_warp_imgs * back_head_mask)
+
+            struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
+                          2 * idt_cri(str_src_imgs, cycle_warp_imgs)
+
+            # fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
+            #            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+
+            fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
+                    face_cri(tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+
+            # mask loss
+            mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+
+            loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # print_losses(step=step, total=loss, cyc=cycle_loss,
+            #              str=struct_loss, fid=fid_loss, msk=mask_loss)
+
+            if verbose:
+                logger.set_description(
+                    (
+                        f'step: {step}; '
+                        f'total: {loss.item():.6f}; cyc: {cycle_loss.item():.6f}; '
+                        f'str: {struct_loss.item():.6f}; fid: {fid_loss.item():.6f}; '
+                        f'msk: {mask_loss.item():.6f}'
+                    )
+                )
+
+            if step % 10 == 0:
+                self.visualize(visualizer, input_imgs=src_imgs, tsf_imgs=fake_tsf_imgs,
+                               cyc_imgs=cycle_tsf_imgs, fake_tsf_mask=fake_tsf_mask,
+                               init_preds=init_preds,
+                               str_src_imgs=str_src_imgs,
+                               cycle_warp_imgs=cycle_warp_imgs)
+
+            if step > fix_iters:
+                cur_lr = update_learning_rate(optimizer, cur_lr, init_lr, final_lr, fix_iters)
+
+        self.generator.eval()
+

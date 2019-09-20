@@ -365,9 +365,9 @@ def back_face_mapping(nf, head_face_info, front_face_info, fill_back=False):
     return map_fn, bg
 
 
-def create_mapping(map_name, mapping_path='pretrains/mapper.txt', part_info='pretrains/smpl_part_info.json',
-                   part_info_2='pretrains/smpl_part_info_2.json',
-                   front_info='pretrains/front_face_1.json',
+def create_mapping(map_name, mapping_path='pretrains/mapper.txt',
+                   part_info='pretrains/smpl_part_info.json',
+                   front_info='pretrains/front_facial.json',
                    head_info='pretrains/head.json',
                    contain_bg=True, fill_back=False):
     """
@@ -402,8 +402,6 @@ def create_mapping(map_name, mapping_path='pretrains/mapper.txt', part_info='pre
         bg = np.array([[0, 0, 1]], dtype=np.float32)
     elif map_name == 'par':
         map_fn, bg = par_mapping(nf, part_info)
-    elif map_name == 'par_v2':
-        map_fn, bg = par_mapping(nf, part_info_2)
     elif map_name == 'front':
         map_fn, bg = front_face_mapping(nf, front_info, fill_back=fill_back)
     elif map_name == 'head':
@@ -425,10 +423,9 @@ def create_mapping(map_name, mapping_path='pretrains/mapper.txt', part_info='pre
 
 def get_part_face_ids(part_type, mapping_path='pretrains/mapper.txt',
                       part_info='pretrains/smpl_part_info.json',
-                      part_info_2='pretrains/smpl_part_info_2.json',
                       front_info='pretrains/front_face_1.json',
                       head_info='pretrains/head.json',
-                      contain_bg=True, fill_back=False):
+                      fill_back=False):
     # F x C
     f2vts = get_f2vts(mapping_path, fill_back=fill_back)
     nf = f2vts.shape[0]

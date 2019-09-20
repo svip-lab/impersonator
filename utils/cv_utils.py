@@ -1,10 +1,10 @@
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-import torch
-import torchvision.transforms.functional as F
-import math
-import ipdb
+
+
+HMR_IMG_SIZE = 224
+IMG_SIZE = 256
 
 
 def read_cv2_img(path):
@@ -45,6 +45,204 @@ def transform_img(image, image_size, transpose=False):
         image = image.transpose((2, 0, 1))
 
     return image
+
+
+def resize_img_with_scale(img, scale_factor):
+    new_size = (np.floor(np.array(img.shape[0:2]) * scale_factor)).astype(int)
+    new_img = cv2.resize(img, (new_size[1], new_size[0]))
+    # This is scale factor of [height, width] i.e. [y, x]
+    actual_factor = [
+        new_size[0] / float(img.shape[0]), new_size[1] / float(img.shape[1])
+    ]
+    return new_img, actual_factor
+
+
+def kp_to_bbox_param(kp, vis_thresh=0, diag_len=150.0):
+    """
+    Finds the bounding box parameters from the 2D keypoints.
+
+    Args:
+        kp (Kx3): 2D Keypoints.
+        vis_thresh (float): Threshold for visibility.
+        diag_len(float): diagonal length of bbox of each person
+
+    Returns:
+        [center_x, center_y, scale]
+    """
+    if kp is None:
+        return
+
+    if kp.shape[1] == 3:
+        vis = kp[:, 2] > vis_thresh
+        if not np.any(vis):
+            return
+        min_pt = np.min(kp[vis, :2], axis=0)
+        max_pt = np.max(kp[vis, :2], axis=0)
+    else:
+        min_pt = np.min(kp, axis=0)
+        max_pt = np.max(kp, axis=0)
+
+    person_height = np.linalg.norm(max_pt - min_pt)
+    if person_height < 0.5:
+        return
+    center = (min_pt + max_pt) / 2.
+    scale = diag_len / person_height
+
+    return np.append(center, scale)
+
+
+def cal_process_params(im_path, bbox_param, rescale=None, image=None, image_size=IMG_SIZE, proc=False):
+    """
+    Args:
+        im_path (str): the path of image.
+        image (np.ndarray or None): if it is None, then loading the im_path, else use image.
+        bbox_param (3,) : [cx, cy, scale].
+        rescale (float, np.ndarray or None): rescale factor.
+        proc (bool): the flag to return processed image or not.
+        image_size (int): the cropped image.
+
+    Returns:
+        proc_img (np.ndarray): if proc is True, return the process image, else return the original image.
+    """
+    if image is None:
+        image = read_cv2_img(im_path)
+
+    orig_h, orig_w = image.shape[0:2]
+    center = bbox_param[:2]
+    scale = bbox_param[2]
+    if rescale is not None:
+        scale = rescale
+
+    if proc:
+        image_scaled, scale_factors = resize_img_with_scale(image, scale)
+        resized_h, resized_w = image_scaled.shape[:2]
+    else:
+        scale_factors = [scale, scale]
+        resized_h = orig_h * scale
+        resized_w = orig_w * scale
+
+    center_scaled = np.round(center * scale_factors).astype(np.int)
+
+    if proc:
+        # Make sure there is enough space to crop image_size x image_size.
+        image_padded = np.pad(
+            array=image_scaled,
+            pad_width=((image_size,), (image_size,), (0,)),
+            mode='edge'
+        )
+        padded_h, padded_w = image_padded.shape[0:2]
+    else:
+        padded_h = resized_h + image_size * 2
+        padded_w = resized_w + image_size * 2
+
+    center_scaled += image_size
+
+    # Crop image_size x image_size around the center.
+    margin = image_size // 2
+    start_pt = (center_scaled - margin).astype(int)
+    end_pt = (center_scaled + margin).astype(int)
+    end_pt[0] = min(end_pt[0], padded_w)
+    end_pt[1] = min(end_pt[1], padded_h)
+
+    if proc:
+        proc_img = image_padded[start_pt[1]:end_pt[1], start_pt[0]:end_pt[0], :]
+        height, width = image_scaled.shape[:2]
+    else:
+        height, width = end_pt[1] - start_pt[1], end_pt[0] - start_pt[0]
+        proc_img = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
+        # proc_img = None
+
+    center_scaled -= start_pt
+    im_shape = [height, width]
+
+    return {
+        # return original too with info.
+        'image': proc_img,
+        'im_path': im_path,
+        'im_shape': im_shape,
+        'orig_im_shape': [orig_h, orig_w],
+        'center': center_scaled,
+        'scale': scale,
+        'start_pt': start_pt,
+    }
+
+
+def cam_denormalize(cam, N):
+    # This is camera in crop image coord.
+    new_cam = np.hstack([N * cam[0] * 0.5, cam[1:] + (2. / cam[0]) * 0.5])
+    return new_cam
+
+
+def cam_init2orig(cam, scale, start_pt, N=HMR_IMG_SIZE):
+    """
+    Args:
+        cam (3,): (s, tx, ty)
+        scale (float): scale = resize_h / orig_h
+        start_pt (2,): (lt_x, lt_y)
+        N (int): hmr_image_size (224) or IMG_SIZE
+
+    Returns:
+        cam_orig (3,): (s, tx, ty), camera in original image coordinates.
+
+    """
+    # This is camera in crop image coord.
+    cam_crop = np.hstack([N * cam[0] * 0.5, cam[1:] + (2. / cam[0]) * 0.5])
+
+    print('cam_init', cam)
+    print('cam_crop', cam_crop)
+
+    # This is camera in orig image coord
+    cam_orig = np.hstack([
+        cam_crop[0] / scale,
+        cam_crop[1:] + (start_pt - N) / cam_crop[0]
+    ])
+    print('cam_orig', cam_orig)
+    return cam_orig
+
+
+def cam_orig2crop(cam, scale, start_pt, N=IMG_SIZE, normalize=True):
+    """
+    Args:
+        cam (3,): (s, tx, ty), camera in orginal image coordinates.
+        scale (float): scale = resize_h / orig_h or (resize_w / orig_w)
+        start_pt (2,): (lt_x, lt_y)
+        N (int): hmr_image_size (224) or IMG_SIZE
+        normalize (bool)
+
+    Returns:
+
+    """
+    cam_recrop = np.hstack([
+        cam[0] * scale,
+        cam[1:] + (N - start_pt) / (scale * cam[0])
+    ])
+    if normalize:
+        cam_norm = np.hstack([
+            cam_recrop[0] * (2. / N),
+            cam_recrop[1:] - N / (2 * cam_recrop[0])
+        ])
+    else:
+        cam_norm = cam_recrop
+    return cam_norm
+
+
+def cam_process(cam_init, scale_150, start_pt_150, scale_proc, start_pt_proc, image_size):
+    """
+    Args:
+        cam_init:
+        scale_150:
+        start_pt_150:
+        scale_proc:
+        start_pt_proc:
+        image_size
+
+    Returns:
+
+    """
+    cam_orig = cam_init2orig(cam_init, scale=scale_150, start_pt=start_pt_150, N=HMR_IMG_SIZE)
+    cam_crop = cam_orig2crop(cam_orig, scale=scale_proc, start_pt=start_pt_proc, N=image_size, normalize=True)
+
+    return cam_crop
 
 
 def show_cv2_img(img, title='img'):
@@ -176,64 +374,6 @@ def get_rotated_smpl_pose(pose, theta):
     rotated_pose[:3] = new_global_pose
 
     return rotated_pose
-
-
-class ImageTransformer(object):
-    """
-    Rescale the image in a sample to a given size.
-    """
-
-    def __init__(self, output_size):
-        """
-        :type output_size: tuple or int
-        :param output_size: Desired output size. If tuple, output is matched to output_size.
-                            If int, smaller of image edges is matched to output_size keeping aspect ratio the same.
-        """
-        assert isinstance(output_size, (int, tuple))
-        self.output_size = output_size
-
-    def __call__(self, sample):
-        images = sample['images']
-        resized_images = []
-
-        for image in images:
-            image = cv2.resize(image, (self.output_size, self.output_size))
-            image = image.astype(np.float32)
-            image /= 255.0
-            image = image * 2 - 1
-
-            image = np.transpose(image, (2, 0, 1))
-
-            resized_images.append(image)
-
-        resized_images = np.stack(resized_images, axis=0)
-
-        sample['images'] = resized_images
-        return sample
-
-
-class ImageNormalizeToTensor(object):
-    """
-    Rescale the image in a sample to a given size.
-    """
-
-    def __call__(self, image):
-        image = F.to_tensor(image)
-        image.mul_(2.0)
-        image.sub_(1.0)
-        return image
-
-
-class ToTensor(object):
-    """
-    Convert ndarrays in sample to Tensors.
-    """
-
-    def __call__(self, sample):
-        sample['images'] = torch.Tensor(sample['images']).float()
-        sample['smpls'] = torch.Tensor(sample['smpls']).float()
-
-        return sample
 
 
 if __name__ == '__main__':

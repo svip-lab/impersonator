@@ -11,8 +11,8 @@ import glob
 from data.dataset import DatasetBase
 from models.models import ModelsFactory
 from options.test_options import TestOptions
-from utils.demo_visualizer import MotionImitationVisualizer
-from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_head_bbox
+from utils.visdom_visualizer import VisdomVisualizer
+from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_mask_bbox
 import utils.cv_utils as cv_utils
 import utils.mesh as mesh
 
@@ -471,7 +471,7 @@ if __name__ == "__main__":
     viewer = ModelsFactory.get_by_name(opt.model, opt)
 
     if opt.visual:
-        visualizer = MotionImitationVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
+        visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
     else:
         visualizer = None
 

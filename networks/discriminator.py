@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+import torch.nn.functional as F
 import functools
 from .networks import NetworkBase
 
@@ -55,6 +55,45 @@ class PatchDiscriminator(NetworkBase):
     def forward(self, input):
         """Standard forward."""
         return self.model(input)
+
+
+class GlobalLocalDiscriminator(NetworkBase):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_type='batch', use_sigmoid=False):
+        super(GlobalLocalDiscriminator, self).__init__()
+        self.global_model = PatchDiscriminator(4, ndf=ndf, n_layers=n_layers,
+                                               norm_type=norm_type, use_sigmoid=use_sigmoid)
+        self.local_model = PatchDiscriminator(input_nc, ndf=ndf, n_layers=n_layers,
+                                              norm_type=norm_type, use_sigmoid=use_sigmoid)
+        # from utils.demo_visualizer import MotionImitationVisualizer
+        # self._visualizer = MotionImitationVisualizer('debug', ip='http://10.10.10.100', port=31102)
+
+    def forward(self, global_x, local_x, local_rects):
+        glocal_outs = self.global_model(global_x)
+        crop_imgs = self.crop_body(local_x, local_rects)
+        local_outs = self.local_model(crop_imgs)
+
+        # self._visualizer.vis_named_img('body_imgs', crop_imgs[:, 0:3])
+
+        return torch.cat([glocal_outs, local_outs], dim=0)
+
+    @staticmethod
+    def crop_body(imgs, rects):
+        """
+        :param imgs: (N, C, H, W)
+        :return:
+        """
+        bs, _, ori_h, ori_w = imgs.shape
+        head_imgs = []
+
+        for i in range(bs):
+            min_x, max_x, min_y, max_y = rects[i].detach()
+            head = imgs[i:i+1, :, min_y:max_y, min_x:max_x]  # (1, c, h', w')
+            head = F.interpolate(head, size=(ori_h, ori_w), mode='bilinear', align_corners=True)
+            head_imgs.append(head)
+
+        head_imgs = torch.cat(head_imgs, dim=0)
+
+        return head_imgs
 
 
 class MultiScaleDiscriminator(NetworkBase):

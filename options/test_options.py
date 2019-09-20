@@ -20,7 +20,7 @@ class TestOptions(BaseOptions):
         self._parser.add_argument('--front_warp', action="store_true", default=False, help='front warp or not')
         self._parser.add_argument('--post_tune', action="store_true", default=False, help='post tune or not')
 
-        # Motion transfer
+        # Human motion imitation
         self._parser.add_argument('--cam_strategy', type=str, default='smooth',
                                   choices=['smooth', 'source', 'copy'],
                                   help='the flag to copy cam or not.')

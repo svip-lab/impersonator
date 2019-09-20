@@ -10,21 +10,21 @@ class DatasetFactory(object):
 
     @staticmethod
     def get_by_name(dataset_name, opt, is_for_train):
-        if dataset_name == 'mi':
-            from data.motion_transfer import MIDataset
-            dataset = MIDataset(opt, is_for_train)
+        if dataset_name == 'imper':
+            from data.imper_dataset import ImPerDataset
+            dataset = ImPerDataset(opt, is_for_train)
 
-        elif dataset_name == 'mi_v2':
-            from data.motion_transfer import MIDatasetV2
-            dataset = MIDatasetV2(opt, is_for_train)
+        elif dataset_name == 'fashion':
+            from data.fashion_dataset import FashionPairDataset
+            dataset = FashionPairDataset(opt, is_for_train)
 
-        elif dataset_name == 'fast_mi':
-            from data.motion_transfer import FastLoadMIDataset
-            dataset = FastLoadMIDataset(opt, is_for_train)
+        elif dataset_name == 'imper_place':
+            from data.imper_fashion_place_dataset import ImPerPlaceDataset
+            dataset = ImPerPlaceDataset(opt, is_for_train)
 
-        elif dataset_name == 'miv2_place':
-            from data.motion_transfer import MIv2PlaceDataset
-            dataset = MIv2PlaceDataset(opt, is_for_train)
+        elif dataset_name == 'imper_fashion_place':
+            from data.imper_fashion_place_dataset import ImPerFashionPlaceDataset
+            dataset = ImPerFashionPlaceDataset(opt, is_for_train)
 
         else:
             raise ValueError("Dataset [%s] not recognized." % dataset_name)
