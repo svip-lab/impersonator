@@ -5,8 +5,10 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 
 ## Getting Started
 ### Requirements
-```
+``` bash
 Python 3.6+ and PyTorch 1.0+.
+
+pip install -r requirements.txt
 ```
 
 ### Installation
@@ -15,64 +17,22 @@ cd thirdparty/neural_renderer
 python setup.py install
 ```
 
+### Download resources.
+1. Download `pretrains.zip` from [OneDrive]("https://1drv.ms/u/s!AjjUqiJZsj8whLNw4QyntCMsDKQjSg?e=L77Elv") or
+[BaiduPan]("https://pan.baidu.com/s/11S7Z6Jj3WAfVNxBWyBjW6w") and then move the pretrains.zip to 
+the `assets` directory and unzip this file.
+
+2. Download `checkpoints.zip` from [OneDrive]("https://1drv.ms/u/s!AjjUqiJZsj8whLNyoEh67Uu0LlxquA?e=dkOnhQ") and then 
+unzip the `checkpoints.zip` and move them to `outputs` directory.
+
+3. Download `samples.zip` from [OneDrive]("https://1drv.ms/u/s!AjjUqiJZsj8whLNxCKkPaJnqxbbodQ?e=40uty2"), and then
+unzip the `samples.zip` and move them to `assets` directory.
+
 ### Run Demos and Examples
-If the IP is http://10.10.10.100, and the port is 31102
-```shell
-python -m visdom.server --port 31102
-```
+The details are shown in [runDemo.md](./doc/runDemo.md).
 
-#### Example 1: Motion Imitation
-```
-python demo_imitator.py --gpu_ids 0 \
-    --model imitator_v2 \
-    --gen_name impersonator \
-    --name impersonator_mi \
-    --checkpoints_dir /public/liuwen/p300/models \
-    --output_dir /root/poseGANs/meta_train/impersonator_mi  \
-    --image_size 256  --map_name uv_seg   \
-    --ip http://10.10.10.100 --port 31102   \
-    --bg_model /root/poseGANs/meta_train/background_inpaintor/net_epoch_50_id_G.pth \
-    --src_path /root/poseGANs/meta_train/samples/all_img/men1_256.jpg    \
-    --tgt_path /root/poseGANs/meta_train/samples/ref_imgs/2  \
-    --pri_path /root/poseGANs/meta_train/samples/ref_imgs/1  \
-    --has_detector  --bg_ks 7 --ft_ks 3  --front_warp --post_tune --visual
-```
-![motion imitation](assets/motion_transfer.jpg)
-
-#### Example 2: Appearance Transfer
-
-```
-python demo_swap.py --gpu_ids 9 \
-    --model swapper_v2 \
-    --gen_name impersonator \
-    --name impersonator_mi \
-    --checkpoints_dir /public/liuwen/p300/models \
-    --output_dir '' \
-    --image_size 256  --map_name uv_seg  --swap_part body  \
-    --ip http://10.10.10.100 --port 31102   \
-    --has_detector  --bg_ks 7 --ft_ks 3 --front_warp  --post_tune \
-    --bg_model /root/poseGANs/meta_train/background_inpaintor/net_epoch_50_id_G.pth \
-    --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
-    --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
-```
-![appearance transfer](assets/appearance_transfer.jpg)
-
-#### Example 3: Novel View Synthesis
-```
-python demo_view.py --gpu_ids 9 \
-    --model viewer_v2 \
-    --gen_name impersonator \
-    --name impersonator_mi \
-    --checkpoints_dir /public/liuwen/p300/models \
-    --output_dir /root/poseGANs/meta_train/impersonator_mi \
-    --image_size 256  --map_name uv_seg  --swap_part body  \
-    --ip http://10.10.10.100 --port 31102   \
-    --has_detector  --bg_ks 7 --ft_ks 3   --front_warp --post_tune \
-    --bg_model /root/poseGANs/meta_train/background_inpaintor/net_epoch_50_id_G.pth \
-    --src_path  /root/poseGANs/meta_train/samples/all_img/men1_256.jpg \
-    --tgt_path  /root/poseGANs/meta_train/samples/all_img/8_256.jpg  --visual
-```
-![novel view](assets/novel_view.jpg)
+### Training from Scratch
+The details are shown in [train.md](./doc/train.md).
 
 ## Citation
 ![thunmbnail](assets/thumbnail.jpg)

@@ -18,7 +18,7 @@ class NetworksFactory(object):
             from .generator import ImpersonatorGenerator
             network = ImpersonatorGenerator(*args, **kwargs)
 
-        elif network_name == 'inpaintor':
+        elif network_name == 'deepfillv2':
             from .inpaintor import InpaintSANet
             network = InpaintSANet(*args, **kwargs)
 
@@ -209,7 +209,7 @@ class HMRLoss(nn.Module):
 
 
 class FaceLoss(nn.Module):
-    def __init__(self, pretrained_path='pretrains/sphere20a_20171020.pth'):
+    def __init__(self, pretrained_path='asset/spretrains/sphere20a_20171020.pth'):
         super(FaceLoss, self).__init__()
         if 'senet' in pretrained_path:
             self.net = senet50(include_top=False)
@@ -424,7 +424,7 @@ class StyleLoss(nn.Module):
 
 # class SphereFaceLoss(nn.Module):
 #
-#     def __init__(self, pretrained_path='pretrains/sphere20a_20171020.pth', height=112, width=96):
+#     def __init__(self, pretrained_path='assets/pretrains/sphere20a_20171020.pth', height=112, width=96):
 #         super(SphereFaceLoss, self).__init__()
 #         self.net = Sphere20a()
 #         self.load_model(pretrained_path)

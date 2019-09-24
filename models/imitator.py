@@ -31,7 +31,7 @@ class Imitator(BaseModel):
         self.generator = self._create_generator().cuda()
 
         # 0. create bgnet
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             self.bgnet = self._create_bgnet().cuda()
         else:
             self.bgnet = self.generator.bg_model
@@ -49,7 +49,7 @@ class Imitator(BaseModel):
             self.detector = None
 
     def _create_bgnet(self):
-        net = NetworksFactory.get_by_name('inpaintor', c_dim=4)
+        net = NetworksFactory.get_by_name('deepfillv2', c_dim=4)
         self._load_params(net, self._opt.bg_model, need_module=False)
         net.eval()
         return net
@@ -123,7 +123,7 @@ class Imitator(BaseModel):
             bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
             body_mask = 1 - bg_mask
 
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             src_info['bg'] = self.bgnet(img, masks=body_mask, only_x=True)
         else:
             incomp_img = img * bg_mask
@@ -269,241 +269,6 @@ class Imitator(BaseModel):
         preds = (1 - front_mask) * preds + self.tsf_info['tsf_img'] * front_mask * (1 - mask)
         # preds = torch.clamp(preds + self.tsf_info['tsf_img'] * front_mask, -1, 1)
         return preds
-
-    def pose_background(self, visualizer):
-        """
-            The idea borrows from Deep Image Prior.
-        Args:
-            visualizer:
-
-        Returns:
-
-        """
-        import networks.losses as losses
-
-        def fill_noise(x, noise_type):
-            """Fills tensor `x` with noise of type `noise_type`."""
-            if noise_type == 'u':
-                x.uniform_()
-            elif noise_type == 'n':
-                x.normal_()
-            else:
-                assert False
-
-        def get_noise(input_depth, method, spatial_size, noise_type='u', var=1. / 10):
-            """Returns a pytorch.Tensor of size (1 x `input_depth` x `spatial_size[0]` x `spatial_size[1]`)
-            initialized in a specific way.
-            Args:
-                input_depth: number of channels in the tensor
-                method: `noise` for fillting tensor with noise; `meshgrid` for np.meshgrid
-                spatial_size: spatial size of the tensor to initialize
-                noise_type: 'u' for uniform; 'n' for normal
-                var: a factor, a noise will be multiplicated by. Basically it is standard deviation scaler.
-            """
-            if isinstance(spatial_size, int):
-                spatial_size = (spatial_size, spatial_size)
-            if method == 'noise':
-                shape = [1, input_depth, spatial_size[0], spatial_size[1]]
-                net_input = torch.zeros(shape)
-
-                fill_noise(net_input, noise_type)
-                net_input *= var
-            elif method == 'meshgrid':
-                assert input_depth == 2
-                X, Y = np.meshgrid(np.arange(0, spatial_size[1]) / float(spatial_size[1] - 1),
-                                   np.arange(0, spatial_size[0]) / float(spatial_size[0] - 1))
-                meshgrid = np.concatenate([X[None, :], Y[None, :]])
-                net_input = torch.tensor(meshgrid).float()
-            else:
-                assert False
-
-            return net_input
-
-        def print_losses(*args, **kwargs):
-
-            print('step = {}'.format(kwargs['step']))
-            for key, value in kwargs.items():
-                if key == 'epoch' or key == 'step':
-                    continue
-                print('\t{}, {:.6f}'.format(key, value.item()))
-
-        def compute_tv(mat):
-            return torch.mean(torch.abs(mat[:, :, :, :-1] - mat[:, :, :, 1:])) + \
-                   torch.mean(torch.abs(mat[:, :, :-1, :] - mat[:, :, 1:, :]))
-
-        init_lr = 0.001
-        num_iters = 10000
-        optimizer = torch.optim.Adam(self.bgnet.parameters(), lr=init_lr, betas=(0.5, 0.999))
-        mse = torch.nn.MSELoss()
-
-        feat_extractor = losses.vgg_loss.Vgg19(before_relu=False, get_x=False).cuda()
-        pct_cri = losses.PerceptualLoss(weight=1.0, feat_extractors=feat_extractor)
-
-        incomp_imgs = self.src_info['bg_inputs'][:, 0:3].detach()
-        vis_masks = 1 - self.src_info['bg_inputs'][:, 3:].detach()
-        inputs = get_noise(input_depth=4, method='noise', noise_type='n', spatial_size=vis_masks.shape[2:]).cuda()
-
-        for step in range(num_iters):
-            # inputs = get_noise(input_depth=4, method='noise', spatial_size=vis_masks.shape[2:]).cuda()
-            out = self.bgnet(inputs)
-            mse_loss = mse(out * vis_masks, incomp_imgs)
-            tv_loss = compute_tv(out)
-            loss = mse_loss + 0.001 * tv_loss
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            if step % 10 == 0:
-                print_losses(step=step, total=loss, mse_loss=mse_loss, tv_loss=tv_loss)
-                self.visualize(visualizer, incomp_imgs=incomp_imgs, comp_imgs=out)
-
-        self.generator.eval()
-
-    # def post_personalize(self, out_dir, data_loader, visualizer, verbose=True):
-    #     from networks.networks import FaceLoss
-    #
-    #     bg_inpaint = self.src_info['bg']
-    #
-    #     @torch.no_grad()
-    #     def set_gen_inputs(sample):
-    #         j2ds = sample['j2d'].cuda()  # (N, 4)
-    #         T = sample['T'].cuda()  # (N, h, w, 2)
-    #         T_cycle = sample['T_cycle'].cuda()  # (N, h, w, 2)
-    #         bg_inputs = sample['bg_inputs'].cuda()  # (N, 4, h, w)
-    #         src_inputs = sample['src_inputs'].cuda()  # (N, 6, h, w)
-    #         tsf_inputs = sample['tsf_inputs'].cuda()  # (N, 6, h, w)
-    #         src_fim = sample['src_fim'].cuda()
-    #         tsf_fim = sample['tsf_fim'].cuda()
-    #         init_preds = sample['preds'].cuda()
-    #         images = sample['images']
-    #         images = torch.cat([images[:, 0, ...], images[:, 1, ...]], dim=0).cuda()  # (2N, 3, h, w)
-    #         pseudo_masks = sample['pseudo_masks']
-    #         pseudo_masks = torch.cat([pseudo_masks[:, 0, ...], pseudo_masks[:, 1, ...]],
-    #                                  dim=0).cuda()  # (2N, 1, h, w)
-    #
-    #         return src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, \
-    #                src_inputs, tsf_inputs, images, init_preds, pseudo_masks
-    #
-    #     def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
-    #         # set cycle bg inputs
-    #         tsf_bg_mask = tsf_inputs[:, -1:, ...]
-    #         cycle_bg_inputs = torch.cat([fake_tsf_imgs * (1 - tsf_bg_mask), tsf_bg_mask], dim=1)
-    #
-    #         # set cycle src inputs
-    #         cycle_src_inputs = torch.cat([fake_tsf_imgs * tsf_bg_mask, tsf_inputs[:, 3:]], dim=1)
-    #
-    #         # set cycle tsf inputs
-    #         cycle_tsf_img = F.grid_sample(fake_tsf_imgs, T_cycle)
-    #         cycle_tsf_inputs = torch.cat([cycle_tsf_img, src_inputs[:, 3:]], dim=1)
-    #
-    #         return cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs
-    #
-    #     def warp(preds, tsf, fim, fake_tsf_mask):
-    #         front_mask = self.render.encode_front_fim(fim, transpose=True)
-    #         preds = (1 - front_mask) * preds + tsf * front_mask * (1 - fake_tsf_mask)
-    #         # preds = torch.clamp(preds + tsf * front_mask, -1, 1)
-    #         return preds
-    #
-    #     def inference(bg_inputs, src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
-    #         fake_bg, fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
-    #             self.generator.forward(bg_inputs, src_inputs, tsf_inputs, T=T)
-    #
-    #         fake_src_imgs = fake_src_mask * bg_inpaint + (1 - fake_src_mask) * fake_src_color
-    #         fake_tsf_imgs = fake_tsf_mask * bg_inpaint + (1 - fake_tsf_mask) * fake_tsf_color
-    #
-    #         if self._opt.front_warp:
-    #             fake_tsf_imgs = warp(fake_tsf_imgs, tsf_inputs[:, 0:3], tsf_fim, fake_tsf_mask)
-    #
-    #         cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs = set_cycle_inputs(
-    #             fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle)
-    #
-    #         cycle_bg, cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
-    #             self.generator.forward(cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
-    #
-    #         cycle_src_imgs = cycle_src_mask * bg_inpaint + (1 - cycle_src_mask) * cycle_src_color
-    #         cycle_tsf_imgs = cycle_tsf_mask * bg_inpaint + (1 - cycle_tsf_mask) * cycle_tsf_color
-    #
-    #         if self._opt.front_warp:
-    #             cycle_tsf_imgs = warp(cycle_tsf_imgs, src_inputs[:, 0:3], src_fim, fake_src_mask)
-    #
-    #         return fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask
-    #
-    #     def create_criterion():
-    #         face_criterion = FaceLoss(pretrained_path=self._opt.face_model).cuda()
-    #         idt_criterion = torch.nn.L1Loss()
-    #         mask_criterion = torch.nn.BCELoss()
-    #
-    #         return face_criterion, idt_criterion, mask_criterion
-    #
-    #     def print_losses(*args, **kwargs):
-    #
-    #         print('epoch = {}, step = {}'.format(kwargs['epoch'], kwargs['step']))
-    #         for key, value in kwargs.items():
-    #             if key == 'epoch' or key == 'step':
-    #                 continue
-    #             print('\t{}, {:.6f}'.format(key, value.item()))
-    #
-    #     init_lr = 0.0002
-    #     nodecay_epochs = 5
-    #     optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
-    #     face_cri, idt_cri, msk_cri = create_criterion()
-    #
-    #     step = 0
-    #     logger = tqdm(range(nodecay_epochs))
-    #     for epoch in logger:
-    #         for i, sample in enumerate(data_loader):
-    #             src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, src_inputs, tsf_inputs, \
-    #             images, init_preds, pseudo_masks = set_gen_inputs(sample)
-    #
-    #             # print(bg_inputs.shape, src_inputs.shape, tsf_inputs.shape)
-    #             bs = tsf_inputs.shape[0]
-    #             src_imgs = images[0:bs]
-    #             fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask = inference(
-    #                 bg_inputs, src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
-    #
-    #             # cycle reconstruction loss
-    #             cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)
-    #
-    #             # structure loss
-    #             bg_mask = src_inputs[:, -1:]
-    #             body_mask = 1 - bg_mask
-    #             str_src_imgs = src_imgs * body_mask
-    #             cycle_warp_imgs = F.grid_sample(fake_tsf_imgs, T_cycle)
-    #             back_head_mask = 1 - self.render.encode_front_fim(tsf_fim, transpose=True, front_fn=False)
-    #             struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
-    #                           2 * idt_cri(str_src_imgs * back_head_mask, cycle_warp_imgs * back_head_mask)
-    #
-    #             fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
-    #                        face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
-    #
-    #             # mask loss
-    #             mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
-    #
-    #             loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
-    #             optimizer.zero_grad()
-    #             loss.backward()
-    #             optimizer.step()
-    #
-    #             # print_losses(epoch=epoch, step=step, total=loss, cyc=cycle_loss,
-    #             #              str=struct_loss, fid=fid_loss, msk=mask_loss)
-    #
-    #             if verbose:
-    #                 logger.set_description(
-    #                     (
-    #                         f'epoch: {epoch + 1}; step: {step}; '
-    #                         f'total: {loss.item():.6f}; cyc: {cycle_loss.item():.6f}; '
-    #                         f'str: {struct_loss.item():.6f}; fid: {fid_loss.item():.6f}; '
-    #                         f'msk: {mask_loss.item():.6f}'
-    #                     )
-    #                 )
-    #
-    #             if verbose and step % 5 == 0:
-    #                 self.visualize(visualizer, input_imgs=images, tsf_imgs=fake_tsf_imgs, cyc_imgs=cycle_tsf_imgs)
-    #
-    #             step += 1
-    #
-    #     self.generator.eval()
 
     def post_personalize(self, out_dir, data_loader, visualizer, verbose=True):
         from networks.networks import FaceLoss

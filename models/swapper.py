@@ -1,17 +1,13 @@
-import os
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
-# from utils.nmr import SMPLRenderer
 from utils.detectors import PersonMaskRCNNDetector
 from utils.nmr import SMPLRenderer
 import utils.cv_utils as cv_utils
 import utils.util as util
 import utils.mesh as mesh
-
-import ipdb
 
 
 class Swapper(BaseModel):
@@ -44,7 +40,7 @@ class Swapper(BaseModel):
         self.generator = self._create_generator().cuda()
 
         # 0. create bgnet
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             self.bgnet = self._create_bgnet().cuda()
         else:
             self.bgnet = self.generator.bg_model
@@ -62,7 +58,7 @@ class Swapper(BaseModel):
             self.detector = None
 
     def _create_bgnet(self):
-        net = NetworksFactory.get_by_name('inpaintor', c_dim=4)
+        net = NetworksFactory.get_by_name('deepfillv2', c_dim=4)
         self._load_params(net, self._opt.bg_model, need_module=False)
         net.eval()
         return net
@@ -141,7 +137,7 @@ class Swapper(BaseModel):
             bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
             body_mask = 1 - bg_mask
 
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             src_info['bg'] = self.bgnet(img, masks=body_mask, only_x=True)
         else:
             incomp_img = img * bg_mask
@@ -212,9 +208,8 @@ class Swapper(BaseModel):
         selected_ids = self.PART_IDS[target_part]
         left_ids = [i for i in self.PART_IDS['all'] if i not in selected_ids]
 
-        src_part_mask = (torch.sum(src_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
-        # tgt_part_mask = (torch.sum(tgt_info['part'][:, selected_ids, ...], dim=1) != 0).byte()
-        src_left_mask = torch.sum(src_info['part'][:, left_ids, ...], dim=1).byte()
+        src_part_mask = (torch.sum(src_info['part'][:, selected_ids, ...], dim=1) != 0).bool()
+        src_left_mask = torch.sum(src_info['part'][:, left_ids, ...], dim=1).bool()
 
         # selected_faces = merge_list(selected_ids)
         left_faces = merge_list(left_ids)
@@ -224,14 +219,18 @@ class Swapper(BaseModel):
         tsf21 = self.generator.transform(tgt_info['img'], T21)
         tsf11 = self.generator.transform(src_info['img'], T11)
 
-        tsf_img = tsf21 * (src_part_mask[:, None, :, :].float()) + tsf11 * (src_left_mask[:, None, :, :].float())
+        src_part_mask = src_part_mask[:, None, :, :].float()
+        src_left_mask = src_left_mask[:, None, :, :].float()
+        tsf_img = tsf21 * src_part_mask + tsf11 * src_left_mask
 
         tsf_inputs = torch.cat([tsf_img, src_info['cond']], dim=1)
 
         preds, tsf_mask = self.forward(tsf_inputs, tgt_info['feats'], T21, src_info['feats'], T11, src_info['bg'])
 
         if self._opt.front_warp:
-            preds = self.warp(preds, tsf_img, src_info['fim'], tsf_mask)
+            preds = tsf11 * src_left_mask + (1 - src_left_mask) * preds
+
+            # preds = self.warp_front(preds, src_info['img'], src_info['fim'], tsf_mask)
 
         if visualizer is not None:
             self.visualize(visualizer, src_img=src_info['img'], tgt_img=tgt_info['img'], preds=preds)
@@ -398,8 +397,9 @@ class Swapper(BaseModel):
         logger = tqdm(range(total_iters))
         for step in logger:
 
-            fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(
-                src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
+            fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, \
+            fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(src_inputs, tsf_inputs,
+                                                                       T, T_cycle, src_fim, tsf_fim)
 
             # cycle reconstruction loss
             cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)

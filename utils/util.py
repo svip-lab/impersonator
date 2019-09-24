@@ -6,10 +6,9 @@ import cv2
 import torch
 import torch.nn.functional as F
 import torchvision
+import torchvision.transforms.functional as TF
 import math
 import pickle
-
-import utils.mesh as mesh
 
 
 class ImageTransformer(object):
@@ -19,8 +18,8 @@ class ImageTransformer(object):
 
     def __init__(self, output_size):
         """
-        :type output_size: tuple or int
-        :param output_size: Desired output size. If tuple, output is matched to output_size.
+        Args:
+            output_size (tuple or int): Desired output size. If tuple, output is matched to output_size.
                             If int, smaller of image edges is matched to output_size keeping aspect ratio the same.
         """
         assert isinstance(output_size, (int, tuple))
@@ -52,7 +51,8 @@ class ImageNormalizeToTensor(object):
     """
 
     def __call__(self, image):
-        image = F.to_tensor(image)
+        # image = F.to_tensor(image)
+        image = TF.to_tensor(image)
         image.mul_(2.0)
         image.sub_(1.0)
         return image
@@ -160,7 +160,7 @@ def to_tensor(tensor):
 
 def plot_fim_enc(fim_enc, map_name):
     # import matplotlib.pyplot as plt
-
+    import utils.mesh as mesh
     if not isinstance(fim_enc, np.ndarray):
         fim_enc = fim_enc.cpu().numpy()
 
@@ -216,6 +216,14 @@ def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
     return path
+
+
+def clear_dir(path):
+    import shutil
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    return mkdir(path)
 
 
 def save_image(image_numpy, image_path):

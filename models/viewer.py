@@ -31,7 +31,7 @@ class Viewer(BaseModel):
         self.generator = self._create_generator().cuda()
 
         # 0. create bgnet
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             self.bgnet = self._create_bgnet().cuda()
         else:
             self.bgnet = self.generator.bg_model
@@ -49,7 +49,7 @@ class Viewer(BaseModel):
             self.detector = None
 
     def _create_bgnet(self):
-        net = NetworksFactory.get_by_name('inpaintor', c_dim=4)
+        net = NetworksFactory.get_by_name('deepfillv2', c_dim=4)
         self._load_params(net, self._opt.bg_model, need_module=False)
         net.eval()
         return net
@@ -123,7 +123,7 @@ class Viewer(BaseModel):
             bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
             body_mask = 1 - bg_mask
 
-        if self._opt.bg_model:
+        if self._opt.bg_model != 'ORIGINAL':
             src_info['bg'] = self.bgnet(img, masks=body_mask, only_x=True)
         else:
             incomp_img = img * bg_mask

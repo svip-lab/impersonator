@@ -365,10 +365,10 @@ def back_face_mapping(nf, head_face_info, front_face_info, fill_back=False):
     return map_fn, bg
 
 
-def create_mapping(map_name, mapping_path='pretrains/mapper.txt',
-                   part_info='pretrains/smpl_part_info.json',
-                   front_info='pretrains/front_facial.json',
-                   head_info='pretrains/head.json',
+def create_mapping(map_name, mapping_path='assets/pretrains/mapper.txt',
+                   part_info='assets/pretrains/smpl_part_info.json',
+                   front_info='assets/pretrains/front_facial.json',
+                   head_info='assets/pretrains/head.json',
                    contain_bg=True, fill_back=False):
     """
     :param mapping_path:
@@ -421,10 +421,10 @@ def create_mapping(map_name, mapping_path='pretrains/mapper.txt',
     return map_fn
 
 
-def get_part_face_ids(part_type, mapping_path='pretrains/mapper.txt',
-                      part_info='pretrains/smpl_part_info.json',
-                      front_info='pretrains/front_face_1.json',
-                      head_info='pretrains/head.json',
+def get_part_face_ids(part_type, mapping_path='assets/pretrains/mapper.txt',
+                      part_info='assets/pretrains/smpl_part_info.json',
+                      front_info='assets/pretrains/front_face_1.json',
+                      head_info='assets/pretrains/head.json',
                       fill_back=False):
     # F x C
     f2vts = get_f2vts(mapping_path, fill_back=fill_back)

@@ -113,7 +113,7 @@ class PairSampleDataset(DatasetBase):
         self.map_fn = mesh.create_mapping(map_name=opt.map_name, mapping_path=opt.uv_mapping,
                                           contain_bg=True, fill_back=False)
         # prepare head mapping function
-        # self.head_fn = mesh.create_mapping('head', head_info='pretrains/head.json',
+        # self.head_fn = mesh.create_mapping('head', head_info='assets/pretrains/head.json',
         #                                    contain_bg=True, fill_back=False)
 
         self.bg_kernel = torch.ones(1, 1, self.bg_ks, self.bg_ks, dtype=torch.float32)
@@ -470,7 +470,7 @@ if __name__ == "__main__":
     # set imitator
     viewer = ModelsFactory.get_by_name(opt.model, opt)
 
-    if opt.visual:
+    if opt.ip:
         visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
     else:
         visualizer = None

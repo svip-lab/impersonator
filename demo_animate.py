@@ -91,7 +91,7 @@ if __name__ == "__main__":
     # set animator
     animator = ModelsFactory.get_by_name(opt.model, opt)
 
-    if opt.visual:
+    if opt.ip:
         visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
     else:
         visualizer = None

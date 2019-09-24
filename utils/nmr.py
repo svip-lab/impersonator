@@ -101,8 +101,8 @@ def hamilton_product(qa, qb):
 
 
 class SMPLRenderer(nn.Module):
-    def __init__(self, face_path='pretrains/smpl_faces.npy',
-                 uv_map_path='pretrains/mapper.txt', map_name='uv_seg', tex_size=3, image_size=256,
+    def __init__(self, face_path='assets/pretrains/smpl_faces.npy',
+                 uv_map_path='assets/pretrains/mapper.txt', map_name='uv_seg', tex_size=3, image_size=256,
                  anti_aliasing=True, fill_back=False, background_color=(0, 0, 0), viewing_angle=30, near=0.1, far=25.0,
                  has_front=False):
         """
