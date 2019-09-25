@@ -39,4 +39,5 @@ python demo_swap.py --gpu_ids ${gpu} \
     --src_path   ${src_path}    \
     --tgt_path   ${tgt_path}    \
     --bg_ks 7 --ft_ks 3         \
-    --has_detector  --post_tune  --front_warp --save_res
+    --has_detector  --post_tune  --front_warp --save_res  \
+    --ip http://10.10.10.100 --port 31102

@@ -35,6 +35,6 @@ python demo_view.py --gpu_ids ${gpu} \
     --load_path ${load_path}    \
     --output_dir ${output_dir}  \
     --src_path   ${src_path}    \
-    --bg_ks 7 --ft_ks 3         \
+    --bg_ks 11 --ft_ks 3         \
     --has_detector  --post_tune  --front_warp --save_res  \
     --ip http://10.10.10.100 --port 31102

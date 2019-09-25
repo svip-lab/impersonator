@@ -120,6 +120,7 @@ class Imitator(BaseModel):
             bbox, body_mask = self.detector.inference(img[0])
             bg_mask = 1 - body_mask
         else:
+            # bg is 1, ft is 0
             bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
             body_mask = 1 - bg_mask
 
@@ -129,7 +130,6 @@ class Imitator(BaseModel):
             incomp_img = img * bg_mask
             bg_inputs = torch.cat([incomp_img, bg_mask], dim=1)
             img_bg = self.bgnet(bg_inputs)
-            src_info['bg_inputs'] = bg_inputs
             # src_info['bg'] = bg_inputs[:, 0:3] + img_bg * bg_inputs[:, -1:]
             src_info['bg'] = img_bg
 
@@ -375,7 +375,8 @@ class Imitator(BaseModel):
                            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
 
                 # mask loss
-                mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+                # mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+                mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), pseudo_masks)
 
                 loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
                 optimizer.zero_grad()

@@ -16,10 +16,12 @@ class TestOptions(BaseOptions):
                                   help='if it is `ORIGINAL`, it will use the '
                                        'original BGNet of the generator of LiquidWarping GAN, '
                                        'otherwise, it will use a pretrain deepfillv2')
-        self._parser.add_argument('--has_detector', action='store_true', help='use mask rcnn or not')
         self._parser.add_argument('--bg_ks', default=13, type=int, help='dilate kernel size.')
         self._parser.add_argument('--ft_ks', default=3, type=int, help='dilate kernel size.')
         self._parser.add_argument('--only_vis', action="store_true", default=False, help='only visible or not')
+        self._parser.add_argument('--has_detector', action='store_true', help='use mask rcnn or not')
+        self._parser.add_argument('--body_seg', action="store_true", default=False,
+                                  help='use the body segmentation estimated by mask rcnn.')
         self._parser.add_argument('--front_warp', action="store_true", default=False, help='front warp or not')
         self._parser.add_argument('--post_tune', action="store_true", default=False, help='post tune or not')
 

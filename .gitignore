@@ -5,4 +5,8 @@
 tools/*
 pretrains
 assets/samples
+outputs/results
 *debug.sh
+*build
+*dist
+thirdparty/neural_renderer/files.txt

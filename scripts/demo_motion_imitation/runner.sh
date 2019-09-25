@@ -1,9 +1,9 @@
 #! /bin/bash
 
 # choose other inputs src img and reference images
-src_path="./assets/samples/src_imgs/men1_256.jpg"
+#src_path="./assets/samples/src_imgs/men1_256.jpg"
+src_path="./assets/samples/src_imgs/009_5_1_000.jpg"
 tgt_path="./assets/samples/ref_imgs/024_8_2"
-
 
 ##
 gpu=0
@@ -37,5 +37,6 @@ python demo_imitator.py --gpu_ids ${gpu} \
     --output_dir ${output_dir}  \
     --src_path   ${src_path}    \
     --tgt_path   ${tgt_path}    \
-    --bg_ks 7 --ft_ks 3         \
-    --has_detector  --post_tune  --front_warp --save_res
+    --bg_ks 11 --ft_ks 3         \
+    --has_detector  --post_tune  --save_res \
+    --ip http://10.10.10.100 --port 31102
