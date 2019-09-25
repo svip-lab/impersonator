@@ -10,3 +10,12 @@ The basic features of Impersonator, including:
 ## ImPer-1.1
 Fix some bugs and update the `post_personalize` function of each task, replacing the `pseudo_masks` with the 
 `tsf_inputs[:, -1:] (src_inputs[:, -1:])`.
+
+## ImPer-1.2
+
+### ImPer-1.2.1
+* add the training document [train.md](../doc/train.md).
+
+### Imper-1.2.2
+* **TODO**: convert all `*.pkl` of smpl files in iPER to `.h5`. This will reduce the loading time.
+* **TODO**: add h5 file Dataset. 
