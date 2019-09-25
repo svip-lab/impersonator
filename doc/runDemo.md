@@ -98,3 +98,17 @@ will result in a more accurate body segmentation.
 body segmentation might be smaller than the actual segmentation. Using the dilation operation to enlarge the mask.
 
 # Run Appearance Transfer
+[Here](../scripts/demo_appearance_transfer/runner.sh) is the basic running scripts. 
+The meaning of each flag is same to motion imitation.
+
+* `--save_res`: If true, the results are saved in `${output_dir}/swappers` folder.
+
+# Run Novel View Synthesis
+[Here](../scripts/demo_novel_view_synthesis/runner.sh) is the basic running scripts. 
+The meaning of each flag is same to motion imitation.
+
+* `--save_res`: If true, the results are saved in `${output_dir}/viewers` folder.
+
+
+
+

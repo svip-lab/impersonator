@@ -3,8 +3,6 @@ import torch
 from torch.optim import lr_scheduler
 from collections import OrderedDict
 
-from utils.mesh import get_map_fn_dim
-
 
 class ModelsFactory(object):
     def __init__(self):
@@ -85,6 +83,7 @@ class BaseModel(object):
         return self._is_train
 
     def cond_nc(self):
+        from utils.mesh import get_map_fn_dim
         if self._opt.map_name:
             nc = get_map_fn_dim(self._opt.map_name)
             _G_cond_nc, _D_cond_nc = nc, nc + nc
