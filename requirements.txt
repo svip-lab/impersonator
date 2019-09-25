@@ -11,7 +11,6 @@ opencv_contrib_python==3.4.2.17
 matplotlib==3.1.1
 ipdb==0.12.2
 Pillow==6.1.0
-data_utils==0.0.7
 progressbar2==3.46.1
 skimage==0.0
 tensorboardX==1.8
