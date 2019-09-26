@@ -3,6 +3,8 @@ PyTorch implementation of our ICCV 2019 paper:
 
 Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance Transfer and Novel View Synthesis
 
+[[paper]]() [[website]]()
+
 <p float="center">
 	<img src='assets/motion/Sweaters-id_0000088807_4_full.jpg' width="135"/>
   	<img src='assets/motion/mixamo_0007_Sweaters-id_0000088807_4_full.gif' width="135"/>
