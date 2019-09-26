@@ -4,18 +4,18 @@ PyTorch implementation of our ICCV 2019 paper:
 Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance Transfer and Novel View Synthesis
 
 <p float="center">
-	<img src='assets/motion/Sweaters-id_0000088807_4_full.jpg' width="109"/>
-  	<img src='assets/motion/mixamo_0007_Sweaters-id_0000088807_4_full.gif' width="109"/>
-  	<img src='assets/appearance/Sweaters-id_0000337302_4_full.jpg' width="109"/>
-	<img src='assets/appearance/Sweaters-id_0000337302_4_full.gif' width="109"/>
-	<img src='assets/novel/Jackets_Vests-id_0000071603_4_full.jpg' width="109"/>
-    <img src='assets/novel/Jackets_Vests-id_0000071603_4_full.gif' width="109"/>
-    <img src='assets/motion/000.jpg' width="109"/>    
-  	<img src='assets/motion/mixamo_0031_000.gif' width="109"/>
-  	<img src='assets/appearance/001_19_1_000.jpg' width="109"/>
-	<img src='assets/appearance/001_19_1_000.gif' width="109"/>
-	<img src='assets/novel/novel_3.jpg' width="109"/>
-    <img src='assets/novel/novel_3.gif' width="109"/>
+	<img src='assets/motion/Sweaters-id_0000088807_4_full.jpg' width="135"/>
+  	<img src='assets/motion/mixamo_0007_Sweaters-id_0000088807_4_full.gif' width="135"/>
+  	<img src='assets/appearance/Sweaters-id_0000337302_4_full.jpg' width="135"/>
+	<img src='assets/appearance/Sweaters-id_0000337302_4_full.gif' width="135"/>
+	<img src='assets/novel/Jackets_Vests-id_0000071603_4_full.jpg' width="135"/>
+    <img src='assets/novel/Jackets_Vests-id_0000071603_4_full.gif' width="135"/>
+    <img src='assets/motion/000.jpg' width="135"/>    
+  	<img src='assets/motion/mixamo_0031_000.gif' width="135"/>
+  	<img src='assets/appearance/001_19_1_000.jpg' width="135"/>
+	<img src='assets/appearance/001_19_1_000.gif' width="135"/>
+	<img src='assets/novel/novel_3.jpg' width="135"/>
+    <img src='assets/novel/novel_3.gif' width="135"/>
 </p>
 
 ## Getting Started
