@@ -16,7 +16,7 @@ from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph
 import utils.cv_utils as cv_utils
 import utils.mesh as mesh
 import pickle
-from tools.video import make_video
+from utils.video import make_video
 from scipy.spatial.transform import Rotation as R
 
 

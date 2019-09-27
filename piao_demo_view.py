@@ -17,7 +17,7 @@ import utils.cv_utils as cv_utils
 import utils.mesh as mesh
 
 import ipdb
-from tools.video import make_video
+from utils.video import make_video
 
 
 @torch.no_grad()
