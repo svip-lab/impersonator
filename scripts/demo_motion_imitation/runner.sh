@@ -26,7 +26,7 @@ bg_model="./outputs/checkpoints/deepfillv2/net_epoch_50_id_G.pth"
 ## otherwise, it will use the BGNet in the original LiquidWarping GAN
 #bg_model="ORIGINAL"
 
-python demo_imitator.py --gpu_ids ${gpu} \
+python run_imitator.py --gpu_ids ${gpu} \
     --model imitator \
     --gen_name impersonator \
     --image_size 256 \

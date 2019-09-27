@@ -1,73 +1,84 @@
-import os
-from models.swapper import Swapper
+from models.models import ModelsFactory
 from options.test_options import TestOptions
 from utils.visdom_visualizer import VisdomVisualizer
-from utils.util import mkdir
+
+import cv2
+import glob
+import os
+import numpy as np
 
 
-def get_img_name(img_path: str):
-    """
-        Get the name from the image path.
+def tensor2cv2(img_tensor):
+    img = (img_tensor[0].cpu().numpy().transpose(1, 2, 0) + 1) / 2
+    img = img[:, :, ::-1]
+    img = (img * 255).astype(np.uint8)
 
-    Args:
-        img_path (str): a/b.jpg or a/b.png ...
-
-    Returns:
-        name (str): a/b.jpg -> b
-    """
-    image_name = os.path.split(img_path)[-1].split('.')[0]
-    return image_name
-
-
-def save_results(src_path, tgt_path, output_dir, preds):
-    """
-        Save the results.
-    """
-    import utils.cv_utils as cv_utils
-
-    src_name = get_img_name(src_path)
-    tgt_name = get_img_name(tgt_path)
-
-    preds = preds[0].permute(1, 2, 0)
-    preds = preds.cpu().numpy()
-
-    filepath = os.path.join(output_dir, '{}->{}.png'.format(src_name, tgt_name))
-    cv_utils.save_cv2_img(preds, filepath, normalize=True)
-    print('\n\t\t\tSaving results to {}'.format(filepath))
+    return img
 
 
 if __name__ == "__main__":
+
     opt = TestOptions().parse()
+    # opt.src_path = 'meta_train/samples/all_img/men1_256.jpg'
+    # opt.tgt_path = 'meta_train/samples/all_img/8_256.jpg'
 
-    # set imitator
-    swapper = Swapper(opt=opt)
+    # opt.src_path = 'good_actor/woman/fashionWOMENBlouses_Shirtsid0000694703_4full.jpg'
+    # opt.src_path = 'good_actor/woman/Sweaters-id_0000363204_4_full.jpg'
+    # opt.src_path = 'good_actor/man/Jackets_Vests-id_0000190301_4_full.jpg'
+    # opt.src_path = 'good_actor/woman/Sweaters-id_0000337302_4_full.jpg'
+    opt.src_path = 'good_actor/imper/000.jpg'
 
-    if opt.ip:
-        visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
-    else:
-        visualizer = None
+    # opt.tgt_path = 'good_actor/woman/fashionWOMENBlouses_Shirtsid0000695303_4full.jpg'
+    # opt.tgt_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
+    # opt.tgt_path = 'good_actor/man/Jackets_Vests-id_0000190301_4_full.jpg'
+    # opt.tgt_path = 'good_actor/man/Jackets_Vests-id_0000009401_4_full.jpg'
+    opt.tgt_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
+    # opt.tgt_path = 'good_actor/imper/000.jpg'
+    # opt.tgt_path = 'good_actor/woman/Sweaters-id_0000337302_4_full.jpg'
 
-    src_path = opt.src_path
-    tgt_path = opt.tgt_path
+    opt.front_warp = True
+    opt.visual = True
+    opt.post_tune = True
 
-    swapper.swap_setup(src_path, tgt_path)
+    tgt_path_list = sorted(glob.glob("good_actor/*/*"))
+    src_path_list = sorted(glob.glob("good_actor/imper/*"))
 
-    if opt.post_tune:
-        print('\n\t\t\tPersonalization: meta cycle finetune...')
-        swapper.post_personalize(opt.output_dir, visualizer=None, verbose=False)
+    for src_path in src_path_list:
+        opt.src_path = src_path
 
-    print('\n\t\t\tPersonalization: completed...')
+        for tgt_path in tgt_path_list:
+            opt.tgt_path = tgt_path
 
-    # if a->b
-    print('\n\t\t\tSwapping: {} wear the clothe of {}...'.format(src_path, tgt_path))
-    preds = swapper.swap(src_info=swapper.src_info, tgt_info=swapper.tsf_info,
-                         target_part=opt.swap_part, visualizer=visualizer)
+            # set imitator
+            swapper = ModelsFactory.get_by_name(opt.model, opt)
 
-    if opt.save_res:
-        pred_output_dir = mkdir(os.path.join(opt.output_dir, 'swappers'))
-        save_results(src_path, tgt_path, pred_output_dir, preds)
+            if opt.visual:
+                visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
+            else:
+                visualizer = None
 
-    # # else b->a
-    # preds = swapper.swap(src_info=swapper.tgt_info, tgt_info=swapper.src_info,
-    #                      target_part=opt.swap_part, visualizer=visualizer)
+            src_path = opt.src_path
+            tgt_path = opt.tgt_path
 
+            swapper.swap_setup(src_path, tgt_path)
+
+            if opt.post_tune:
+                print('\n\t\t\tPersonalization: meta cycle finetune...')
+                swapper.post_personalize(opt.output_dir, visualizer=visualizer, verbose=True)
+
+            print('\n\t\t\tPersonalization: completed...')
+
+            # if a->b
+            print('\n\t\t\tSwapping: {} wear the clothe of {}...'.format(src_path, tgt_path))
+            result = swapper.swap(src_info=swapper.src_info, tgt_info=swapper.tsf_info, target_part=opt.swap_part,
+                                  visualizer=visualizer)
+            # else b->a
+            # swapper.swap(src_info=swapper.tgt_info, tgt_info=swapper.src_info, target_part=opt.swap_part, visualizer=visualizer)
+
+            src_img_true_name = os.path.split(opt.src_path)[-1][:-4]
+
+            save_dir = 'meta_train/swap_result/%s' % src_img_true_name
+            os.makedirs(save_dir, exist_ok=True)
+            save_img_name = '%s.%s' % (os.path.split(opt.src_path)[-1], os.path.split(opt.tgt_path)[-1])
+
+            cv2.imwrite('%s/%s' % (save_dir, save_img_name), tensor2cv2(result))

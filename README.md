@@ -44,8 +44,11 @@ unzip the `checkpoints.zip` and move them to `outputs` directory.
 3. Download `samples.zip` from OneDrive, and then
 unzip the `samples.zip` and move them to `assets` directory.
 
-### Run Demos and Examples
-The details are shown in [runDemo.md](./doc/runDemo.md).
+
+### Running Demo
+
+### Running Scripts (Details)
+The details of each running scripts are shown in [run_scripts.md](doc/run_scripts.md).
 
 ### Training from Scratch
 The details are shown in [train.md](./doc/train.md) [TODO].
