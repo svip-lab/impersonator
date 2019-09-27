@@ -42,7 +42,7 @@ the `assets` directory and unzip this file.
 2. Download `checkpoints.zip` from [OneDrive](https://1drv.ms/u/s!AjjUqiJZsj8whLNyoEh67Uu0LlxquA?e=dkOnhQ) and then 
 unzip the `checkpoints.zip` and move them to `outputs` directory.
 
-3. Download `samples.zip` from OneDrive, and then
+3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s!AjjUqiJZsj8whLNxCKkPaJnqxbbodQ?e=40uty2), and then
 unzip the `samples.zip` and move them to `assets` directory.
 
 
