@@ -2,11 +2,7 @@ import os.path
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from data.dataset import DatasetBase
-import numpy as np
-from utils import cv_utils
-from utils.util import load_pickle_file
-import glob
-import time
+from utils.util import ImageNormalizeToTensor
 
 
 class PlaceDataset(DatasetBase):
@@ -38,35 +34,8 @@ class PlaceDataset(DatasetBase):
         transform_list = [
             transforms.RandomResizedCrop(self._opt.image_size),
             transforms.RandomHorizontalFlip(),
-            cv_utils.ImageNormalizeToTensor()]
+            ImageNormalizeToTensor()]
         self._transform = transforms.Compose(transform_list)
 
-
-if __name__ == '__main__':
-    import ipdb
-    import torch.utils.data
-    from utils.demo_visualizer import MotionImitationVisualizer
-
-    class Object(object):
-        def __init__(self):
-            self.place_dir = '/p300/places365_standard'
-            self.image_size = 256
-
-    opts = Object()
-    train_place_dataset = PlaceDataset(opts, is_for_train=True)
-    test_place_datast = PlaceDataset(opts, is_for_train=False)
-
-    total_datast = torch.utils.data.ConcatDataset([train_place_dataset, test_place_datast])
-    print(len(train_place_dataset), len(test_place_datast), len(total_datast))
-
-    # visualizer = MotionImitationVisualizer(env='debug', ip='http://10.10.10.100', port=31100)
-    #
-    # for i in range(1000):
-    #     image = train_place_dataset[i]
-    #
-    #     visualizer.vis_named_img('image', image[None, ...])
-    #
-    #     print(i, image.shape)
-    #     time.sleep(1)
 
 

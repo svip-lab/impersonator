@@ -2,13 +2,72 @@ from __future__ import print_function
 from PIL import Image
 import numpy as np
 import os
+import cv2
 import torch
 import torch.nn.functional as F
 import torchvision
+import torchvision.transforms.functional as TF
 import math
 import pickle
 
-import utils.mesh as mesh
+
+class ImageTransformer(object):
+    """
+    Rescale the image in a sample to a given size.
+    """
+
+    def __init__(self, output_size):
+        """
+        Args:
+            output_size (tuple or int): Desired output size. If tuple, output is matched to output_size.
+                            If int, smaller of image edges is matched to output_size keeping aspect ratio the same.
+        """
+        assert isinstance(output_size, (int, tuple))
+        self.output_size = output_size
+
+    def __call__(self, sample):
+        images = sample['images']
+        resized_images = []
+
+        for image in images:
+            image = cv2.resize(image, (self.output_size, self.output_size))
+            image = image.astype(np.float32)
+            image /= 255.0
+            image = image * 2 - 1
+
+            image = np.transpose(image, (2, 0, 1))
+
+            resized_images.append(image)
+
+        resized_images = np.stack(resized_images, axis=0)
+
+        sample['images'] = resized_images
+        return sample
+
+
+class ImageNormalizeToTensor(object):
+    """
+    Rescale the image in a sample to a given size.
+    """
+
+    def __call__(self, image):
+        # image = F.to_tensor(image)
+        image = TF.to_tensor(image)
+        image.mul_(2.0)
+        image.sub_(1.0)
+        return image
+
+
+class ToTensor(object):
+    """
+    Convert ndarrays in sample to Tensors.
+    """
+
+    def __call__(self, sample):
+        sample['images'] = torch.Tensor(sample['images']).float()
+        sample['smpls'] = torch.Tensor(sample['smpls']).float()
+
+        return sample
 
 
 def morph(src_bg_mask, ks, mode='erode', kernel=None):
@@ -20,28 +79,24 @@ def morph(src_bg_mask, ks, mode='erode', kernel=None):
 
     if mode == 'erode':
         src_bg_mask_pad = F.pad(src_bg_mask, [pad_s, pad_s, pad_s, pad_s], value=1.0)
-        # print(src_bg_mask.shape, src_bg_mask_pad.shape)
         out = F.conv2d(src_bg_mask_pad, kernel)
-        # print(out.shape)
         out = (out == n_ks).float()
     else:
         src_bg_mask_pad = F.pad(src_bg_mask, [pad_s, pad_s, pad_s, pad_s], value=0.0)
-        # print(src_bg_mask.shape, src_bg_mask_pad.shape)
         out = F.conv2d(src_bg_mask_pad, kernel)
-        # print(out.shape)
         out = (out >= 1).float()
 
     return out
 
 
-def cal_head_bbox(head_mask, factor=1.3):
+def cal_mask_bbox(head_mask, factor=1.3):
     """
     Args:
         head_mask (np.ndarray): (N, 1, 256, 256).
         factor (float): the factor to enlarge the bbox of head.
 
     Returns:
-        bbox (np.ndarray.int32): (N, 4), hear, 4 = (left_top_x, left_top_y, right_top_x, right_top_y)
+        bbox (np.ndarray.int32): (N, 4), hear, 4 = (left_top_x, right_top_x, left_top_y, right_top_y)
 
     """
     bs, _, height, width = head_mask.shape
@@ -55,7 +110,9 @@ def cal_head_bbox(head_mask, factor=1.3):
 
         if len(ys) == 0:
             valid[i] = 0.0
-            bbox[i, 2] = width
+            bbox[i, 0] = 0
+            bbox[i, 1] = width
+            bbox[i, 2] = 0
             bbox[i, 3] = height
             continue
 
@@ -82,12 +139,14 @@ def cal_head_bbox(head_mask, factor=1.3):
 
         if (_lt_x == _rt_x) or (_lt_y == _rt_y):
             valid[i] = 0.0
-            bbox[i, 2] = width
+            bbox[i, 0] = 0
+            bbox[i, 1] = width
+            bbox[i, 2] = 0
             bbox[i, 3] = height
         else:
             bbox[i, 0] = _lt_x
-            bbox[i, 1] = _lt_y
-            bbox[i, 2] = _rt_x
+            bbox[i, 1] = _rt_x
+            bbox[i, 2] = _lt_y
             bbox[i, 3] = _rt_y
 
     return bbox, valid
@@ -101,7 +160,7 @@ def to_tensor(tensor):
 
 def plot_fim_enc(fim_enc, map_name):
     # import matplotlib.pyplot as plt
-
+    import utils.mesh as mesh
     if not isinstance(fim_enc, np.ndarray):
         fim_enc = fim_enc.cpu().numpy()
 
@@ -159,15 +218,18 @@ def mkdir(path):
     return path
 
 
+def clear_dir(path):
+    import shutil
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+    return mkdir(path)
+
+
 def save_image(image_numpy, image_path):
     mkdir(os.path.dirname(image_path))
     image_pil = Image.fromarray(image_numpy)
     image_pil.save(image_path)
-
-
-def save_str_data(data, path):
-    mkdir(os.path.dirname(path))
-    np.savetxt(path, data, delimiter=",", fmt="%s")
 
 
 def load_pickle_file(pkl_path):

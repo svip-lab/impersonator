@@ -4,9 +4,9 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import utils.util as util
 from .models import BaseModel
-from networks.networks import NetworksFactory, HumanModelRecovery, VGGLoss, SphereFaceLoss
+from networks.networks import NetworksFactory, HumanModelRecovery, Vgg19, VGGLoss, FaceLoss, StyleLoss
 # from utils.nmr import SMPLRenderer
-from utils.nmr_v2 import SMPLRenderer
+from utils.nmr import SMPLRenderer
 import ipdb
 
 
@@ -20,10 +20,6 @@ class BodyRecoveryFlow(torch.nn.Module):
         # create networks
         self._init_create_networks()
 
-        # buffers
-        self.register_buffer('initial_T',
-                             torch.zeros(self._opt.image_size, self._opt.image_size, 2, dtype=torch.float32))
-
     def _create_hmr(self):
         hmr = HumanModelRecovery(smpl_pkl_path=self._opt.smpl_model)
         saved_data = torch.load(self._opt.hmr_model)
@@ -31,97 +27,137 @@ class BodyRecoveryFlow(torch.nn.Module):
         hmr.eval()
         return hmr
 
-    def _create_render(self):
+    def _create_render(self, faces):
         render = SMPLRenderer(map_name=self._opt.map_name,
                               uv_map_path=self._opt.uv_mapping,
                               tex_size=self._opt.tex_size,
                               image_size=self._opt.image_size, fill_back=False,
-                              anti_aliasing=True, background_color=(0, 0, 0))
+                              anti_aliasing=True, background_color=(0, 0, 0), has_front=False)
 
         return render
 
     def _init_create_networks(self):
         # hmr and render
         self._hmr = self._create_hmr()
-        self._render = self._create_render()
-
-    def _transformer(self, src_cams, src_verts, src_fim, tgt_fim):
-        bs = src_fim.shape[0]
-
-        T = self.initial_T.repeat(bs, 1, 1, 1)   # (bs, image_size, image_size, 2)
-
-        # 2. calculate occlusion flows, (bs, no, 2)
-        tgt_ids = tgt_fim != -1
-
-        # 3. calculate tgt flows, (bs, nt, 2)
-        points = self._render.batch_orth_proj_idrot(src_cams, src_verts)
-        f2pts = self._render.points_to_faces(points)
-        bc_f2pts = self._render.compute_barycenter(f2pts)  # (bs, nf, 2)
-
-        for i in range(bs):
-            Ti = T[i]
-
-            tgt_i = tgt_ids[i]
-
-            # (nf, 2)
-            tgt_flows = bc_f2pts[i, tgt_fim[i, tgt_i].long()]      # (nt, 2)
-            Ti[tgt_i] = tgt_flows
-
-        return T
+        self._render = self._create_render(self._hmr.smpl.faces)
 
     def forward(self, aug_img, src_img, src_smpl, ref_smpl):
-        # source process
+        # get smpl information
         src_info = self._hmr.get_details(src_smpl)
-        src_rd, src_info['tex'] = self._render.forward(src_info['cam'], src_info['verts'],
-                                                       src_img, is_uv_sampler=False,
-                                                       reverse_yz=True, get_fim=False)
+        ref_info = self._hmr.get_details(ref_smpl)
 
-        src_cond, src_info['fim'] = self._render.encode_fim(src_info['cam'], src_info['verts'], transpose=True)
-        src_bg_mask = self.morph(src_cond[:, -1:, :, :], ks=15, mode='erode')
-        src_crop_mask = self.morph(src_cond[:, -1:, :, :], ks=3, mode='erode')
+        # process source inputs
+        src_f2verts, src_fim, _ = self._render.render_fim_wim(src_info['cam'], src_info['verts'])
+        src_f2verts = src_f2verts[:, :, :, 0:2]
+        src_f2verts[:, :, :, 1] *= -1
+        src_cond, _ = self._render.encode_fim(src_info['cam'], src_info['verts'], fim=src_fim, transpose=True)
+        src_bg_mask = util.morph(src_cond[:, -1:, :, :], ks=15, mode='erode')
+        src_crop_mask = util.morph(src_cond[:, -1:, :, :], ks=3, mode='erode')
 
         # bg input
-        input_G_bg = torch.cat([src_img * src_bg_mask, src_bg_mask], dim=1)
         input_G_aug_bg = torch.cat([aug_img * src_bg_mask, src_bg_mask], dim=1)
+        input_G_bg = torch.cat([src_img * src_bg_mask, src_bg_mask], dim=1)
 
         # src input
-        input_src = src_img * (1 - src_crop_mask)
-        input_G_src = torch.cat([input_src, src_cond], dim=1)
+        input_G_src = torch.cat([src_img * (1 - src_crop_mask), src_cond], dim=1)
 
-        # transfer
-        ref_info = self._hmr.get_details(ref_smpl)
-        syn_img, _ = self._render.render(ref_info['cam'], ref_info['verts'], src_info['tex'], reverse_yz=True, get_fim=False)
-        ref_cond, ref_info['fim'] = self._render.encode_fim(ref_info['cam'], ref_info['verts'], transpose=True)
+        # process reference inputs
+        _, ref_fim, ref_wim = self._render.render_fim_wim(ref_info['cam'], ref_info['verts'])
+        ref_cond, _ = self._render.encode_fim(ref_info['cam'], ref_info['verts'], fim=ref_fim, transpose=True)
+        T = self._render.cal_bc_transform(src_f2verts, ref_fim, ref_wim)
+        syn_img = F.grid_sample(src_img, T)
         input_G_tsf = torch.cat([syn_img, ref_cond], dim=1)
 
-        tsf_crop_mask = self.morph(ref_cond[:, -1:, :, :], ks=3, mode='erode')
+        # masks
+        tsf_crop_mask = util.morph(ref_cond[:, -1:, :, :], ks=3, mode='erode')
         bg_mask = torch.cat([src_crop_mask, tsf_crop_mask], dim=0)
 
-        conds = torch.cat([src_cond, ref_cond], dim=1)
-        # set transformation matrix
-        T = self._transformer(src_info['cam'], src_info['verts'], src_fim=src_info['fim'], tgt_fim=ref_info['fim'])
+        head_bbox = self.cal_head_bbox(ref_info['j2d'])
+        body_bbox = self.cal_body_bbox(ref_info['j2d'])
 
-        return input_G_bg, input_G_aug_bg, input_G_src, input_G_tsf, T, bg_mask, conds, ref_info['j2d']
+        return input_G_aug_bg, input_G_bg, input_G_src, input_G_tsf, T, bg_mask, head_bbox, body_bbox
 
-    @staticmethod
-    def morph(self, src_bg_mask, ks, mode='erode'):
-        device = src_bg_mask.device
+    def cal_head_bbox(self, kps):
+        """
+        Args:
+            kps: (N, 19, 2)
 
-        n_ks = ks ** 2
-        kernel = torch.ones(1, 1, ks, ks, dtype=torch.float32).to(device)
+        Returns:
+            bbox: (N, 4)
+        """
+        NECK_IDS = 12
 
-        pad_s = ks // 2
-        src_bg_mask_pad = F.pad(src_bg_mask, [pad_s, pad_s, pad_s, pad_s], value=1.0)
-        # print(src_bg_mask.shape, src_bg_mask_pad.shape)
-        out = F.conv2d(src_bg_mask_pad, kernel)
-        # print(out.shape)
+        image_size = self._opt.image_size
 
-        if mode == 'erode':
-            out = (out == n_ks).float()
-        else:
-            out = (out >= 1).float()
+        kps = (kps + 1) / 2.0
 
-        return out
+        necks = kps[:, NECK_IDS, 0]
+        zeros = torch.zeros_like(necks)
+        ones = torch.ones_like(necks)
+
+        # min_x = int(max(0.0, np.min(kps[HEAD_IDS:, 0]) - 0.1) * image_size)
+        min_x, _ = torch.min(kps[:, NECK_IDS:, 0] - 0.05, dim=1)
+        min_x = torch.max(min_x, zeros)
+
+        max_x, _ = torch.max(kps[:, NECK_IDS:, 0] + 0.05, dim=1)
+        max_x = torch.min(max_x, ones)
+
+        # min_x = int(max(0.0, np.min(kps[HEAD_IDS:, 0]) - 0.1) * image_size)
+        min_y, _ = torch.min(kps[:, NECK_IDS:, 1] - 0.05, dim=1)
+        min_y = torch.max(min_y, zeros)
+
+        max_y, _ = torch.max(kps[:, NECK_IDS:, 1], dim=1)
+        max_y = torch.min(max_y, ones)
+
+        min_x = (min_x * image_size).long()  # (T, 1)
+        max_x = (max_x * image_size).long()  # (T, 1)
+        min_y = (min_y * image_size).long()  # (T, 1)
+        max_y = (max_y * image_size).long()  # (T, 1)
+
+        # print(min_x.shape, max_x.shape, min_y.shape, max_y.shape)
+        rects = torch.stack((min_x, max_x, min_y, max_y), dim=1)
+        # import ipdb
+        # ipdb.set_trace()
+        return rects
+
+    def cal_body_bbox(self, kps, factor=1.2):
+        """
+        Args:
+            kps (torch.cuda.FloatTensor): (N, 19, 2)
+            factor (float):
+
+        Returns:
+            bbox: (N, 4)
+        """
+        image_size = self._opt.image_size
+        bs = kps.shape[0]
+        kps = (kps + 1) / 2.0
+        zeros = torch.zeros((bs,), device=kps.device)
+        ones = torch.ones((bs,), device=kps.device)
+
+        min_x, _ = torch.min(kps[:, :, 0], dim=1)
+        max_x, _ = torch.max(kps[:, :, 0], dim=1)
+        middle_x = (min_x + max_x) / 2
+        width = (max_x - min_x) * factor
+        min_x = torch.max(zeros, middle_x - width / 2)
+        max_x = torch.min(ones, middle_x + width / 2)
+
+        min_y, _ = torch.min(kps[:, :, 1], dim=1)
+        max_y, _ = torch.max(kps[:, :, 1], dim=1)
+        middle_y = (min_y + max_y) / 2
+        height = (max_y - min_y) * factor
+        min_y = torch.max(zeros, middle_y - height / 2)
+        max_y = torch.min(ones, middle_y + height / 2)
+
+        min_x = (min_x * image_size).long()  # (T,)
+        max_x = (max_x * image_size).long()  # (T,)
+        min_y = (min_y * image_size).long()  # (T,)
+        max_y = (max_y * image_size).long()  # (T,)
+
+        # print(min_x.shape, max_x.shape, min_y.shape, max_y.shape)
+        bboxs = torch.stack((min_x, max_x, min_y, max_y), dim=1)
+
+        return bboxs
 
 
 class Impersonator(BaseModel):
@@ -158,23 +194,21 @@ class Impersonator(BaseModel):
         # generator network
         self._G = self._create_generator()
         self._G.init_weights()
-        if multi_gpus:
-            self._G = torch.nn.DataParallel(self._G)
+        self._G = torch.nn.DataParallel(self._G)
         self._G.cuda()
 
         # discriminator network
         self._D = self._create_discriminator()
         self._D.init_weights()
-        if multi_gpus:
-            self._D = torch.nn.DataParallel(self._D)
+        self._D = torch.nn.DataParallel(self._D)
         self._D.cuda()
 
     def _create_generator(self):
-        return NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3+self._G_cond_nc,
+        return NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3 + self._G_cond_nc,
                                            tsf_dim=3+self._G_cond_nc, repeat_num=self._opt.repeat_num)
 
     def _create_discriminator(self):
-        return NetworksFactory.get_by_name('discriminator_patch_gan', input_nc=3 + self._D_cond_nc,
+        return NetworksFactory.get_by_name('global_local', input_nc=3 + self._D_cond_nc // 2,
                                            norm_type=self._opt.norm_type, ndf=64, n_layers=4, use_sigmoid=False)
 
     def _init_train_vars(self):
@@ -183,90 +217,92 @@ class Impersonator(BaseModel):
 
         # initialize optimizers
         self._optimizer_G = torch.optim.Adam(self._G.parameters(), lr=self._current_lr_G,
-                                             betas=[self._opt.G_adam_b1, self._opt.G_adam_b2])
+                                             betas=(self._opt.G_adam_b1, self._opt.G_adam_b2))
         self._optimizer_D = torch.optim.Adam(self._D.parameters(), lr=self._current_lr_D,
-                                             betas=[self._opt.D_adam_b1, self._opt.D_adam_b2])
+                                             betas=(self._opt.D_adam_b1, self._opt.D_adam_b2))
 
     def _init_prefetch_inputs(self):
-        self._input_src_img = None
-        self._input_src_smpl = None
-        self._input_bg = None
 
-        self._input_desired_img = None
-        self._input_desired_smpl = None
-
-        self._input_real_imgs = None
+        self._real_bg = None
+        self._real_src = None
+        self._real_tsf = None
 
         self._bg_mask = None
-        self._input_src = None
-        self._input_tsf = None
-        self._input_G_bg = None
         self._input_G_aug_bg = None
         self._input_G_src = None
         self._input_G_tsf = None
-        self._input_cond = None
-        self._j2d = None
+        self._head_bbox = None
+        self._body_bbox = None
 
         self._T = None
 
     def _init_losses(self):
         # define loss functions
         multi_gpus = len(self._gpu_ids) > 1
-        self._criterion_l1 = torch.nn.L1Loss()
+        self._crt_l1 = torch.nn.L1Loss()
 
-        if multi_gpus:
-            self._criterion_l1 = torch.nn.DataParallel(self._criterion_l1)
-        self._criterion_l1.cuda()
+        if self._opt.mask_bce:
+            self._crt_mask = torch.nn.BCELoss()
+        else:
+            self._crt_mask = torch.nn.MSELoss()
 
+        vgg_net = Vgg19()
         if self._opt.use_vgg:
-            self._criterion_vgg = VGGLoss()
+            self._crt_vgg = VGGLoss(vgg=vgg_net)
             if multi_gpus:
-                self._criterion_vgg = torch.nn.DataParallel(self._criterion_vgg)
-            self._criterion_vgg.cuda()
+                self._crt_vgg = torch.nn.DataParallel(self._crt_vgg)
+            self._crt_vgg.cuda()
+
+        if self._opt.use_style:
+            self._crt_sty = StyleLoss(feat_extractors=vgg_net)
+            if multi_gpus:
+                self._crt_sty = torch.nn.DataParallel(self._crt_sty)
+            self._crt_sty.cuda()
 
         if self._opt.use_face:
-            self._criterion_face = SphereFaceLoss()
+            self._crt_face = FaceLoss(pretrained_path=self._opt.face_model)
             if multi_gpus:
-                self._criterion_face = torch.nn.DataParallel(self._criterion_face)
-            self._criterion_face.cuda()
+                self._criterion_face = torch.nn.DataParallel(self._crt_face)
+            self._crt_face.cuda()
 
         # init losses G
-        self._loss_g_l1 = self._Tensor([0])
-        self._loss_g_vgg = self._Tensor([0])
-        self._loss_g_face = self._Tensor([0])
-        self._loss_g_adv = self._Tensor([0])
-        self._loss_g_smooth = self._Tensor([0])
-        self._loss_g_mask = self._Tensor([0])
-        self._loss_g_mask_smooth = self._Tensor([0])
+        self._g_l1 = self._Tensor([0])
+        self._g_vgg = self._Tensor([0])
+        self._g_style = self._Tensor([0])
+        self._g_face = self._Tensor([0])
+        self._g_adv = self._Tensor([0])
+        self._g_smooth = self._Tensor([0])
+        self._g_mask = self._Tensor([0])
+        self._g_mask_smooth = self._Tensor([0])
 
         # init losses D
         self._d_real = self._Tensor([0])
         self._d_fake = self._Tensor([0])
 
+    @torch.no_grad()
     def set_input(self, input):
 
-        with torch.no_grad():
-            images = input['images']
-            smpls = input['smpls']
-            bgs = input['bg']
-            self._input_bg = bgs.cuda()
-            self._input_src_img = images[:, 0, ...].contiguous().cuda()
-            self._input_src_smpl = smpls[:, 0, ...].contiguous().cuda()
-            self._input_desired_img = images[:, 1, ...].contiguous().cuda()
-            self._input_desired_smpl = smpls[:, 1, ...].contiguous().cuda()
+        images = input['images']
+        smpls = input['smpls']
+        aug_bg = input['bg'].cuda()
+        src_img = images[:, 0, ...].contiguous().cuda()
+        src_smpl = smpls[:, 0, ...].contiguous().cuda()
+        tsf_img = images[:, 1, ...].contiguous().cuda()
+        tsf_smpl = smpls[:, 1, ...].contiguous().cuda()
 
-            input_G_bg, input_G_aug_bg, input_G_src, input_G_tsf, T, bg_mask, conds, j2ds = self._bdr(
-                self._input_bg, self._input_src_img, self._input_src_smpl, self._input_desired_smpl)
+        input_G_aug_bg, input_G_bg, input_G_src, input_G_tsf, T, bg_mask, head_bbox, body_bbox = \
+            self._bdr(aug_bg, src_img, src_smpl, tsf_smpl)
 
-            self._input_G_bg = input_G_bg
-            self._input_G_aug_bg = input_G_aug_bg
-            self._input_G_src = input_G_src
-            self._input_G_tsf = input_G_tsf
-            self._input_cond = conds
-            self._bg_mask = bg_mask
-            self._T = T
-            self._j2d = j2ds
-            self._input_real_imgs = torch.cat([self._input_bg, self._input_src_img, self._input_desired_img], dim=0)
+        self._input_G_aug_bg = torch.cat([input_G_bg, input_G_aug_bg], dim=0)
+        self._input_G_src = input_G_src
+        self._input_G_tsf = input_G_tsf
+        self._bg_mask = bg_mask
+        self._T = T
+        self._head_bbox = head_bbox
+        self._body_bbox = body_bbox
+        self._real_src = src_img
+        self._real_tsf = tsf_img
+        self._real_bg = aug_bg
 
     def set_train(self):
         self._G.train()
@@ -279,27 +315,31 @@ class Impersonator(BaseModel):
 
     def forward(self, keep_data_for_visuals=False, return_estimates=False):
         # generate fake images
-        fake_bg, fake_aug_bg, fake_src_imgs, fake_src_mask, fake_tsf_imgs, fake_tsf_mask = \
-            self._G.forward(self._input_G_bg, self._input_G_aug_bg, self._input_G_src, self._input_G_tsf, T=self._T)
+        fake_aug_bg, fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
+            self._G.forward(self._input_G_aug_bg, self._input_G_src, self._input_G_tsf, T=self._T)
+
+        bs = fake_src_color.shape[0]
+        fake_bg = fake_aug_bg[0:bs]
+        fake_src_imgs = fake_src_mask * fake_bg + (1 - fake_src_mask) * fake_src_color
+        fake_tsf_imgs = fake_tsf_mask * fake_bg + (1 - fake_tsf_mask) * fake_tsf_color
 
         fake_masks = torch.cat([fake_src_mask, fake_tsf_mask], dim=0)
-        fake_imgs = torch.cat([fake_aug_bg, fake_src_imgs, fake_tsf_imgs], dim=0)
 
         # keep data for visualization
         if keep_data_for_visuals:
-            self.transfer_imgs(fake_bg, fake_imgs, fake_masks)
+            self.visual_imgs(fake_bg, fake_aug_bg, fake_src_imgs, fake_tsf_imgs, fake_masks)
+            # self.visualizer.vis_named_img('fake_aug_bg', fake_aug_bg)
+            # self.visualizer.vis_named_img('fake_aug_bg_input', self._input_G_aug_bg[:, 0:3])
+            # self.visualizer.vis_named_img('real_bg', self._real_bg)
 
-        return fake_tsf_imgs, fake_imgs, fake_masks
+        return fake_aug_bg[bs:], fake_src_imgs, fake_tsf_imgs, fake_masks
 
     def optimize_parameters(self, trainable=True, keep_data_for_visuals=False):
         if self._is_train:
             # convert tensor to variables
-            self._B = self._input_src_img.size(0)
+            fake_aug_bg, fake_src_imgs, fake_tsf_imgs, fake_masks = self.forward(keep_data_for_visuals=keep_data_for_visuals)
 
-            # run
-            fake_tsf_imgs, fake_imgs, fake_masks = self.forward(keep_data_for_visuals=keep_data_for_visuals)
-
-            loss_G = self._optimize_G(fake_tsf_imgs, fake_imgs, fake_masks)
+            loss_G = self._optimize_G(fake_aug_bg, fake_src_imgs, fake_tsf_imgs, fake_masks)
 
             self._optimizer_G.zero_grad()
             loss_G.backward()
@@ -307,38 +347,50 @@ class Impersonator(BaseModel):
 
             # train D
             if trainable:
-                loss_D = self._optimize_D(fake_tsf_imgs)
+                loss_D = self._optimize_D(fake_aug_bg, fake_tsf_imgs)
                 self._optimizer_D.zero_grad()
                 loss_D.backward()
                 self._optimizer_D.step()
 
-    def _optimize_G(self, fake_tsf_imgs, fake_imgs, fake_masks):
-        fake_input_D = torch.cat([fake_tsf_imgs, self._input_cond], dim=1)
-        d_fake_outs = self._D.forward(fake_input_D)
-        self._loss_g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
+    def _optimize_G(self, fake_aug_bg, fake_src_imgs, fake_tsf_imgs, fake_masks):
+        bs = fake_tsf_imgs.shape[0]
 
-        self._loss_g_l1 = torch.mean(self._criterion_l1(fake_imgs, self._input_real_imgs)) * self._opt.lambda_lp
+        fake_global = torch.cat([fake_aug_bg, self._input_G_aug_bg[bs:, -1:]], dim=1)
+        fake_local = torch.cat([fake_tsf_imgs, self._input_G_tsf[:, 3:]], dim=1)
+        d_fake_outs = self._D.forward(fake_global, fake_local, self._body_bbox)
+        self._g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
+
+        self._g_l1 = self._crt_l1(fake_src_imgs, self._real_src) * self._opt.lambda_lp
 
         if self._opt.use_vgg:
-            self._loss_g_vgg = torch.mean(self._criterion_vgg(fake_imgs, self._input_real_imgs)) * self._opt.lambda_vgg
+            self._g_vgg = torch.mean(self._crt_vgg(fake_tsf_imgs, self._real_tsf)
+                                     + self._crt_vgg(fake_aug_bg, self._real_bg)) * self._opt.lambda_vgg
+
+        if self._opt.use_style:
+            self._g_style = torch.mean(self._crt_sty(fake_tsf_imgs, self._real_tsf)
+                                       + self._crt_sty(fake_aug_bg, self._real_bg)) * self._opt.lambda_style
 
         if self._opt.use_face:
-            self._loss_g_face = torch.mean(self._criterion_face(fake_tsf_imgs, self._input_desired_img,
-                                                                self._j2d, self._j2d)) * self._opt.lambda_face
+            self._g_face = torch.mean(self._crt_face(fake_tsf_imgs, self._real_tsf, bbox1=self._head_bbox,
+                                                     bbox2=self._head_bbox)) * self._opt.lambda_face
         # loss mask
-        self._loss_g_mask = torch.mean((fake_masks - self._bg_mask) ** 2) * self._opt.lambda_mask
-        self._loss_g_mask_smooth = self._compute_loss_smooth(fake_masks) * self._opt.lambda_mask_smooth
+        self._g_mask = self._crt_mask(fake_masks, self._bg_mask) * self._opt.lambda_mask
+
+        if self._opt.lambda_mask_smooth != 0:
+            self._g_mask_smooth = self._compute_loss_smooth(fake_masks) * self._opt.lambda_mask_smooth
 
         # combine losses
-        return self._loss_g_adv + self._loss_g_l1 + self._loss_g_vgg + self._loss_g_face + \
-               self._loss_g_mask + self._loss_g_mask_smooth
+        return self._g_adv + self._g_l1 + self._g_vgg + self._g_style + self._g_face + self._g_mask + self._g_mask_smooth
 
-    def _optimize_D(self, fake_tsf_imgs):
-        fake_input_D = torch.cat([fake_tsf_imgs.detach(), self._input_cond], dim=1)
-        real_input_D = torch.cat([self._input_desired_img, self._input_cond], dim=1)
+    def _optimize_D(self, fake_aug_bg, fake_tsf_imgs):
+        bs = fake_tsf_imgs.shape[0]
+        fake_global = torch.cat([fake_aug_bg.detach(), self._input_G_aug_bg[bs:, -1:]], dim=1)
+        fake_local = torch.cat([fake_tsf_imgs.detach(), self._input_G_tsf[:, 3:]], dim=1)
+        real_global = torch.cat([self._real_bg, self._input_G_aug_bg[bs:, -1:]], dim=1)
+        real_local = torch.cat([self._real_tsf, self._input_G_tsf[:, 3:]], dim=1)
 
-        d_real_outs = self._D.forward(real_input_D)
-        d_fake_outs = self._D.forward(fake_input_D)
+        d_real_outs = self._D.forward(real_global, real_local, self._body_bbox)
+        d_fake_outs = self._D.forward(fake_global, fake_local, self._body_bbox)
 
         _loss_d_real = self._compute_loss_D(d_real_outs, 1) * self._opt.lambda_D_prob
         _loss_d_fake = self._compute_loss_D(d_fake_outs, -1) * self._opt.lambda_D_prob
@@ -353,16 +405,16 @@ class Impersonator(BaseModel):
         return torch.mean((x - y) ** 2)
 
     def _compute_loss_smooth(self, mat):
-        return torch.sum(torch.abs(mat[:, :, :, :-1] - mat[:, :, :, 1:])) + \
-               torch.sum(torch.abs(mat[:, :, :-1, :] - mat[:, :, 1:, :]))
+        return torch.mean(torch.abs(mat[:, :, :, :-1] - mat[:, :, :, 1:])) + \
+               torch.mean(torch.abs(mat[:, :, :-1, :] - mat[:, :, 1:, :]))
 
     def get_current_errors(self):
-        loss_dict = OrderedDict([('g_l1', self._loss_g_l1.item()),
-                                 ('g_vgg', self._loss_g_vgg.item()),
-                                 ('g_face', self._loss_g_face.item()),
-                                 ('g_adv', self._loss_g_adv.item()),
-                                 ('g_mask', self._loss_g_mask.item()),
-                                 ('g_mask_smooth', self._loss_g_mask_smooth.item()),
+        loss_dict = OrderedDict([('g_l1', self._g_l1.item()),
+                                 ('g_vgg', self._g_vgg.item()),
+                                 ('g_face', self._g_face.item()),
+                                 ('g_adv', self._g_adv.item()),
+                                 ('g_mask', self._g_mask.item()),
+                                 ('g_mask_smooth', self._g_mask_smooth.item()),
                                  ('d_real', self._d_real.item()),
                                  ('d_fake', self._d_fake.item())])
 
@@ -376,19 +428,33 @@ class Impersonator(BaseModel):
         visuals = OrderedDict()
 
         # inputs
-        visuals['1_fake_bg'] = self._vis_fake_bg
-        visuals['2_fake_mask'] = self._vis_fake_mask
-        visuals['3_real_image'] = self._vis_batch_real_img
-        visuals['4_fake_image'] = self._vis_batch_fake_img
+        visuals['1_real_img'] = self._vis_input
+        visuals['2_input_tsf'] = self._vis_tsf
+        visuals['3_fake_bg'] = self._vis_fake_bg
+
+        # outputs
+        visuals['4_fake_tsf'] = self._vis_fake_tsf
+        visuals['5_fake_src'] = self._vis_fake_src
+        visuals['6_fake_mask'] = self._vis_mask
+
+        # batch outputs
+        visuals['7_batch_real_img'] = self._vis_batch_real
+        visuals['8_batch_fake_img'] = self._vis_batch_fake
 
         return visuals
 
-    def transfer_imgs(self, fake_bg, fake_imgs, fake_masks):
-        self._vis_fake_bg = util.tensor2im(fake_bg[-1].data)
-        self._vis_fake_mask = util.tensor2maskim(fake_masks[-1].data)
+    @torch.no_grad()
+    def visual_imgs(self, fake_bg, fake_aug_bg, fake_src_imgs, fake_tsf_imgs, fake_masks):
+        ids = fake_masks.shape[0] // 2
+        self._vis_input = util.tensor2im(self._real_src)
+        self._vis_tsf = util.tensor2im(self._input_G_tsf[0, 0:3])
+        self._vis_fake_bg = util.tensor2im(fake_bg)
+        self._vis_fake_src = util.tensor2im(fake_src_imgs)
+        self._vis_fake_tsf = util.tensor2im(fake_tsf_imgs)
+        self._vis_mask = util.tensor2maskim(fake_masks[ids])
 
-        self._vis_batch_real_img = util.tensor2im(self._input_real_imgs, idx=-1)
-        self._vis_batch_fake_img = util.tensor2im(fake_imgs.data, idx=-1)
+        self._vis_batch_real = util.tensor2im(torch.cat([self._real_tsf, self._real_bg], dim=0), idx=-1)
+        self._vis_batch_fake = util.tensor2im(torch.cat([fake_tsf_imgs, fake_aug_bg], dim=0), idx=-1)
 
     def save(self, label):
         # save networks
@@ -430,344 +496,72 @@ class Impersonator(BaseModel):
             param_group['lr'] = self._current_lr_D
         print('update D learning rate: %f -> %f' % (self._current_lr_D + lr_decay_D, self._current_lr_D))
 
+    def debug(self, visualizer):
+        visualizer.vis_named_img('bg_inputs', self._input_G_aug_bg[:, 0:3])
+        ipdb.set_trace()
 
 
-# class ImpersonatorModule(torch.nn.Module):
-#     def __init__(self, opt, G_cond_nc, D_cond_nc):
-#         super(ImpersonatorModule, self).__init__()
-#         self._name = 'ImpersonatorModule'
-#
-#         self._opt = opt
-#         self._G_cond_nc = G_cond_nc
-#         self._D_cond_nc = D_cond_nc
-#
-#         # create networks
-#         self._init_create_networks()
-#
-#         # init train variables and losses
-#         self._init_losses()
-#
-#         self._device_flag = torch.device('cuda:0')
-#
-#     def _init_create_networks(self):
-#
-#         # body recovery Flow
-#         self.bdr = BodyRecoveryFlow(opt=self._opt)
-#         self.bdr.eval()
-#
-#         # generator network
-#         self.G = self._create_generator()
-#         self.G.init_weights()
-#
-#         # discriminator network
-#         self.D = self._create_discriminator()
-#         self.D.init_weights()
-#
-#     def _create_generator(self):
-#         return NetworksFactory.get_by_name(self._opt.gen_name, bg_dim=4, src_dim=3+self._G_cond_nc,
-#                                            tsf_dim=3+self._G_cond_nc, repeat_num=self._opt.repeat_num)
-#
-#     def _create_discriminator(self):
-#         return NetworksFactory.get_by_name('discriminator_patch_gan', input_nc=3 + self._D_cond_nc,
-#                                            ndf=64, n_layers=4, use_sigmoid=False)
-#
-#     def _init_losses(self):
-#         # define loss functions
-#         self._criterion_l1 = torch.nn.L1Loss()
-#
-#         if self._opt.use_vgg:
-#             self._criterion_vgg = VGGLoss()
-#
-#         if self._opt.use_face:
-#             self._criterion_face = SphereFaceLoss()
-#
-#     def set_train(self):
-#         self.G.train()
-#         self.D.train()
-#
-#     def set_eval(self):
-#         self.G.eval()
-#
-#     def produce_mesh(self, images, smpls):
-#         with torch.no_grad():
-#             input_src_img = images[:, 0, ...].contiguous().cuda()
-#             input_src_smpl = smpls[:, 0, ...].contiguous().cuda()
-#             input_desired_img = images[:, 1, ...].contiguous().cuda()
-#             input_desired_smpl = smpls[:, 1, ...].contiguous().cuda()
-#
-#             syn_img, input_G_bg, input_G_src, input_G_tsf, T, bg_mask, conds, j2ds = self.bdr(
-#                 input_src_img, input_src_smpl, input_desired_smpl)
-#
-#             input_real_imgs = torch.cat([input_src_img, input_desired_img], dim=0)
-#
-#             return input_G_bg, input_G_src, input_G_tsf, T, bg_mask, conds, j2ds, input_real_imgs
-#
-#     def generate(self, input_G_bg, input_G_src, input_G_tsf, T):
-#         # generate fake images
-#         fake_bg, fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
-#             self.G.forward(input_G_bg, input_G_src, input_G_tsf, T=T)
-#
-#         fake_src_imgs = fake_src_mask * fake_bg + (1 - fake_src_mask) * fake_src_color
-#         fake_tsf_imgs = fake_tsf_mask * fake_bg + (1 - fake_tsf_mask) * fake_tsf_color
-#
-#         fake_masks = torch.cat([fake_src_mask, fake_tsf_mask], dim=0)
-#         fake_imgs = torch.cat([fake_src_imgs, fake_tsf_imgs], dim=0)
-#
-#         return fake_imgs, fake_masks, fake_bg
-#
-#     def forward(self, images, smpls, is_train=True, train_D=True):
-#         if is_train:
-#             self.set_train()
-#         else:
-#             self.set_eval()
-#
-#         input_G_bg, input_G_src, input_G_tsf, T, bg_masks, conds, j2ds, real_imgs = self.produce_mesh(
-#             images, smpls)
-#
-#         # run
-#         fake_imgs, fake_masks, fake_bg = self.generate(input_G_bg, input_G_src, input_G_tsf, T)
-#
-#         loss_g_adv, loss_g_l1, loss_g_vgg, loss_g_face, loss_g_mask, loss_g_mask_smooth = self._optimize_G(
-#             fake_imgs, fake_masks, real_imgs, bg_masks, conds, j2ds)
-#
-#         loss_G = loss_g_adv + loss_g_l1 + loss_g_vgg + loss_g_face + loss_g_mask + loss_g_mask_smooth
-#
-#         # train D
-#         if train_D:
-#             loss_D, d_real, d_fake = self._optimize_D(fake_imgs, real_imgs, conds)
-#         else:
-#             zero = torch.zeros_like(loss_g_adv)
-#             loss_D, d_real, d_fake = zero, zero, zero
-#
-#         return real_imgs[[0, -1]], fake_imgs[[0, -1]], fake_masks[[0, -1]], fake_bg[[0, -1]], loss_G, loss_D, \
-#                loss_g_adv, loss_g_l1, loss_g_vgg, loss_g_face, loss_g_mask, loss_g_mask_smooth, d_real, d_fake
-#
-#     def _optimize_G(self, fake_imgs, fake_masks, real_imgs, bg_masks, conds, j2ds):
-#         # D(G(Ic1, c2)*M, c2) masked
-#         fake_input_D = torch.cat([fake_imgs, conds], dim=1)
-#         d_fake_outs = self.D.forward(fake_input_D)
-#         loss_g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
-#
-#         # l_cyc(G(Ic1,c2)*M, Ic2)
-#         loss_g_l1 = self._criterion_l1(fake_imgs, real_imgs) * self._opt.lambda_lp
-#
-#         if self._opt.use_vgg:
-#             loss_g_vgg = self._criterion_vgg(fake_imgs, real_imgs) * self._opt.lambda_vgg
-#         else:
-#             loss_g_vgg = 0
-#
-#         if self._opt.use_face:
-#             loss_g_face = self._criterion_face(fake_imgs, real_imgs, j2ds, j2ds) * self._opt.lambda_face
-#         else:
-#             loss_g_face = 0
-#
-#         # loss mask
-#         loss_g_mask = torch.mean((fake_masks - bg_masks) ** 2) * self._opt.lambda_mask
-#         loss_g_mask_smooth = self._compute_loss_smooth(fake_masks) * self._opt.lambda_mask_smooth
-#
-#         # combine losses
-#         return loss_g_adv, loss_g_l1, loss_g_vgg, loss_g_face, loss_g_mask, loss_g_mask_smooth
-#
-#     def _optimize_D(self, fake_imgs, real_imgs, conds):
-#         fake_input_D = torch.cat([fake_imgs.detach(), conds], dim=1)
-#         real_input_D = torch.cat([real_imgs, conds], dim=1)
-#
-#         d_real_outs = self.D.forward(real_input_D)
-#         d_fake_outs = self.D.forward(fake_input_D)
-#
-#         loss_d_real = self._compute_loss_D(d_real_outs, 1) * self._opt.lambda_D_prob
-#         loss_d_fake = self._compute_loss_D(d_fake_outs, -1) * self._opt.lambda_D_prob
-#
-#         # combine losses
-#         return loss_d_fake + loss_d_real, torch.mean(d_real_outs), torch.mean(d_fake_outs)
-#
-#     def _compute_loss_D(self, x, y):
-#         return torch.mean((x - y) ** 2)
-#
-#     def _compute_loss_smooth(self, mat):
-#         return torch.sum(torch.abs(mat[:, :, :, :-1] - mat[:, :, :, 1:])) + \
-#                torch.sum(torch.abs(mat[:, :, :-1, :] - mat[:, :, 1:, :]))
-#
-#
-# class ImpersonatorTrainer(BaseModel):
-#     def __init__(self, opt):
-#         super(ImpersonatorTrainer, self).__init__(opt)
-#         self._name = 'ImpersonatorTrainer'
-#
-#         # create networks
-#         self.impersonator = ImpersonatorModule(self._opt, self._G_cond_nc, self._D_cond_nc)
-#
-#         if len(self._gpu_ids) > 1:
-#             self.impersonator = torch.nn.DataParallel(self.impersonator)
-#         self.impersonator.cuda()
-#
-#         # define optimizers
-#         self._init_train_vars()
-#
-#         # load networks and optimizers
-#         if not self._is_train or self._opt.load_epoch > 0:
-#             self.load()
-#
-#         self._input_images = None
-#         self._input_smpls = None
-#         self._fake_imgs = None
-#         self._fake_masks = None
-#         self._fake_bgs = None
-#         self._visual_pack = None
-#
-#         # init losses G
-#         self._loss_g_l1 = self._Tensor([0])
-#         self._loss_g_vgg = self._Tensor([0])
-#         self._loss_g_face = self._Tensor([0])
-#         self._loss_g_adv = self._Tensor([0])
-#         self._loss_g_smooth = self._Tensor([0])
-#         self._loss_g_mask = self._Tensor([0])
-#         self._loss_g_mask_smooth = self._Tensor([0])
-#
-#         # init losses D
-#         self._d_real = self._Tensor([0])
-#         self._d_fake = self._Tensor([0])
-#
-#     def _init_train_vars(self):
-#         self._current_lr_G = self._opt.lr_G
-#         self._current_lr_D = self._opt.lr_D
-#
-#         # initialize optimizers
-#         self._optimizer_G = torch.optim.Adam(self.impersonator.module.G.parameters(), lr=self._current_lr_G,
-#                                              betas=[self._opt.G_adam_b1, self._opt.G_adam_b2])
-#         self._optimizer_D = torch.optim.Adam(self.impersonator.module.D.parameters(), lr=self._current_lr_D,
-#                                              betas=[self._opt.D_adam_b1, self._opt.D_adam_b2])
-#
-#     def set_input(self, input):
-#
-#         with torch.no_grad():
-#             images = input['images']
-#             smpls = input['smpls']
-#             self._input_images = images
-#             self._input_smpls = smpls
-#
-#     def set_train(self):
-#         self.impersonator.module.G.train()
-#         self.impersonator.module.D.train()
-#         self._is_train = True
-#
-#     def set_eval(self):
-#         self.impersonator.module.G.eval()
-#         self._is_train = False
-#
-#     def forward(self, keep_data_for_visuals=False, return_estimates=False, train_D=False):
-#         # generate fake images
-#         real_images, fake_imgs, fake_masks, fake_bg, loss_G, loss_D, loss_g_adv, loss_g_l1, \
-#         loss_g_vgg, loss_g_face, loss_g_mask, loss_g_mask_smooth, d_real, d_fake = self.impersonator(
-#             self._input_images, self._input_smpls, is_train=self._is_train, train_D=train_D)
-#
-#         loss_G = torch.mean(loss_G)
-#         loss_D = torch.mean(loss_D)
-#
-#         if not train_D:
-#             d_real, d_fake = None, None
-#
-#         self.pack_loss(loss_g_adv, loss_g_l1, loss_g_vgg, loss_g_face, loss_g_mask,
-#                        loss_g_mask_smooth, d_real, d_fake)
-#         # keep data for visualization
-#         if keep_data_for_visuals:
-#             self._visual_pack = self.visual_imgs(real_images, fake_imgs, fake_bg, fake_masks)
-#
-#         return loss_G, loss_D
-#
-#     def optimize_parameters(self, trainable=True, keep_data_for_visuals=False):
-#         if self._is_train:
-#             # run
-#             loss_G, loss_D = self.forward(keep_data_for_visuals=keep_data_for_visuals, train_D=trainable)
-#
-#             self._optimizer_G.zero_grad()
-#             loss_G.backward()
-#             self._optimizer_G.step()
-#
-#             # train D
-#             if trainable:
-#                 self._optimizer_D.zero_grad()
-#                 loss_D.backward()
-#                 self._optimizer_D.step()
-#
-#     def get_current_errors(self):
-#         loss_dict = OrderedDict([('g_l1', self._loss_g_l1.item()),
-#                                  ('g_vgg', self._loss_g_vgg.item()),
-#                                  ('g_face', self._loss_g_face.item()),
-#                                  ('g_adv', self._loss_g_adv.item()),
-#                                  ('g_mask', self._loss_g_mask.item()),
-#                                  ('g_mask_smooth', self._loss_g_mask_smooth.item()),
-#                                  ('d_real', self._d_real.item()),
-#                                  ('d_fake', self._d_fake.item())])
-#
-#         return loss_dict
-#
-#     def get_current_scalars(self):
-#         return OrderedDict([('lr_G', self._current_lr_G), ('lr_D', self._current_lr_D)])
-#
-#     def get_current_visuals(self):
-#         # visuals return dictionary
-#         return self._visual_pack
-#
-#     def pack_loss(self, loss_g_adv, loss_g_l1, loss_g_vgg, loss_g_face,
-#                   loss_g_mask, loss_g_mask_smooth, d_real=None, d_fake=None):
-#
-#         self._loss_g_l1 = torch.mean(loss_g_l1)
-#         self._loss_g_vgg = torch.mean(loss_g_vgg)
-#         self._loss_g_face = torch.mean(loss_g_face)
-#         self._loss_g_adv = torch.mean(loss_g_adv)
-#         self._loss_g_mask = torch.mean(loss_g_mask)
-#         self._loss_g_mask_smooth = torch.mean(loss_g_mask_smooth)
-#
-#         if d_real is not None and d_fake is not None:
-#             self._d_fake = torch.mean(d_fake)
-#             self._d_real = torch.mean(d_real)
-#
-#     def visual_imgs(self, real_images, fake_imgs, fake_bg, fake_masks):
-#         visuals = OrderedDict()
-#         visuals['1_fake_mask'] = util.tensor2maskim(fake_masks[1].data)
-#         visuals['2_real_image'] = util.tensor2im(real_images.data, idx=-1)
-#         visuals['3_fake_image'] = util.tensor2im(fake_imgs.data, idx=-1)
-#         visuals['4_fake_bg'] = util.tensor2im(fake_bg.data, idx=-1)
-#
-#         return visuals
-#
-#     def save(self, label):
-#         # save networks
-#         self._save_network(self.impersonator.module.G, 'G', label)
-#         self._save_network(self.impersonator.module.D, 'D', label)
-#
-#         # save optimizers
-#         self._save_optimizer(self._optimizer_G, 'G', label)
-#         self._save_optimizer(self._optimizer_D, 'D', label)
-#
-#     def load(self):
-#         load_epoch = self._opt.load_epoch
-#
-#         # load G
-#         self._load_network(self.impersonator.module.G, 'G', load_epoch, need_module=True)
-#
-#         if self._is_train:
-#             # load D
-#             self._load_network(self.impersonator.module.D, 'D', load_epoch, need_module=True)
-#
-#             # load optimizers
-#             self._load_optimizer(self._optimizer_G, 'G', load_epoch)
-#             self._load_optimizer(self._optimizer_D, 'D', load_epoch)
-#
-#     def update_learning_rate(self):
-#         # updated learning rate G
-#         final_lr = self._opt.final_lr
-#
-#         lr_decay_G = (self._opt.lr_G - final_lr) / self._opt.nepochs_decay
-#         self._current_lr_G -= lr_decay_G
-#         for param_group in self._optimizer_G.param_groups:
-#             param_group['lr'] = self._current_lr_G
-#         print('update G learning rate: %f -> %f' % (self._current_lr_G + lr_decay_G, self._current_lr_G))
-#
-#         # update learning rate D
-#         lr_decay_D = (self._opt.lr_D - final_lr) / self._opt.nepochs_decay
-#         self._current_lr_D -= lr_decay_D
-#         for param_group in self._optimizer_D.param_groups:
-#             param_group['lr'] = self._current_lr_D
-#         print('update D learning rate: %f -> %f' % (self._current_lr_D + lr_decay_D, self._current_lr_D))
+class ImpersonatorAllSetTrain(Impersonator):
+    def __init__(self, opt):
+        super(ImpersonatorAllSetTrain, self).__init__(opt)
+        self._name = 'ImpersonatorAllSetTrain'
+
+    @torch.no_grad()
+    def set_input(self, input):
+
+        images = input['images']
+        smpls = input['smpls']
+        aug_bg = input['bg'].cuda()
+        src_img = images[:, 0, ...].contiguous().cuda()
+        src_smpl = smpls[:, 0, ...].contiguous().cuda()
+        tsf_img = images[:, 1, ...].contiguous().cuda()
+        tsf_smpl = smpls[:, 1, ...].contiguous().cuda()
+
+        input_G_aug_bg, input_G_bg, input_G_src, input_G_tsf, T, bg_mask, head_bbox, body_bbox = \
+            self._bdr(aug_bg, src_img, src_smpl, tsf_smpl)
+        bs = input_G_bg.shape[0]
+
+        fashion_images = input['fashion_images'].cuda()
+        fashion_G_bg = input['fashion_bg_inputs'].cuda()
+        fashion_G_src = input['fashion_src_inputs'].cuda()
+        fashion_G_tsf = input['fashion_tsf_inputs'].cuda()
+        fashion_T = input['fashion_T'].cuda()
+        fashion_head_bbox = input['fashion_head_bbox'].cuda()
+        fashion_body_bbox = input['fashion_body_bbox'].cuda()
+        fashion_bg_mask = input['fashion_masks'].cuda()
+
+        self._input_G_aug_bg = torch.cat([input_G_bg, fashion_G_bg, input_G_aug_bg], dim=0)
+        self._input_G_src = torch.cat([input_G_src, fashion_G_src], dim=0)
+        self._input_G_tsf = torch.cat([input_G_tsf, fashion_G_tsf], dim=0)
+        self._bg_mask = torch.cat([bg_mask[0:bs], fashion_bg_mask[:, 0],
+                                   bg_mask[bs:], fashion_bg_mask[:, 1]], dim=0)
+        self._T = torch.cat([T, fashion_T], dim=0)
+
+        self._head_bbox = torch.cat([head_bbox, fashion_head_bbox], dim=0)
+        self._body_bbox = torch.cat([body_bbox, fashion_body_bbox], dim=0)
+        self._real_src = torch.cat([src_img, fashion_images[:, 0]], dim=0)
+        self._real_tsf = torch.cat([tsf_img, fashion_images[:, 1]], dim=0)
+        self._real_bg = aug_bg
+
+    def debug(self, visualizer):
+        T = self._T
+        tsf_imgs = F.grid_sample(self._real_src, T)
+
+        visualizer.vis_named_img('bg_inputs', self._input_G_aug_bg[:, 0:3])
+        visualizer.vis_named_img('src_inputs', self._input_G_src[:, 0:3])
+        visualizer.vis_named_img('tsf_inputs', self._input_G_tsf[:, 0:3])
+        visualizer.vis_named_img('tsf_imgs', tsf_imgs)
+        visualizer.vis_named_img('real_src', self._real_src)
+        visualizer.vis_named_img('real_tsf', self._real_tsf)
+        visualizer.vis_named_img('real_bg', self._real_bg)
+        visualizer.vis_named_img('bg_masks', self._bg_mask)
+
+        print(self._head_bbox)
+        print()
+        print(self._body_bbox)
+        ipdb.set_trace()
+
+
+
+
+

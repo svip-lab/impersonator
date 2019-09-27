@@ -70,7 +70,7 @@ class TBVisualizer(object):
 
 if __name__ == '__main__':
     from options.train_options import TrainOptions
-    from data.motion_transfer import SeqMIDataset
+    from data.imper_dataset import SeqMIDataset
     from utils.util import tensor2im
 
     opts = TrainOptions().parse()

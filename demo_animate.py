@@ -5,7 +5,7 @@ import glob
 
 from models.models import ModelsFactory
 from options.test_options import TestOptions
-from utils.demo_visualizer import MotionImitationVisualizer
+from utils.visdom_visualizer import VisdomVisualizer
 
 import ipdb
 
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     # set animator
     animator = ModelsFactory.get_by_name(opt.model, opt)
 
-    if opt.visual:
-        visualizer = MotionImitationVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
+    if opt.ip:
+        visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
     else:
         visualizer = None
 

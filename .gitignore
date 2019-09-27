@@ -1,2 +1,8 @@
 .idea
+*.pyc
+*.zip
+*.pth
+tools/*
 pretrains
+assets/samples
+*debug.sh
