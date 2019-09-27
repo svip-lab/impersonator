@@ -45,7 +45,7 @@ the `assets` directory and unzip this file.
 unzip the `checkpoints.zip` and move them to `outputs` directory.
 
 3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db) or
-[BaiduPan](), and then
+[BaiduPan](https://pan.baidu.com/s/1xAI96709Gvqahq9uYAEXYA), and then
 unzip the `samples.zip` and move them to `assets` directory.
 
 
