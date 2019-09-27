@@ -15,9 +15,9 @@ from utils.demo_visualizer import MotionImitationVisualizer
 from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, morph, cal_head_bbox
 import utils.cv_utils as cv_utils
 import utils.mesh as mesh
-import pickle
+
+import ipdb
 from tools.video import make_video
-from scipy.spatial.transform import Rotation as R
 
 
 @torch.no_grad()
@@ -132,7 +132,6 @@ class PairSampleDataset(DatasetBase):
         self._sample_files = []
 
         pair_ids_filepath = self._opt.train_ids_file if self._is_for_train else self._opt.test_ids_file
-        # pair_ids_filepath = os.path.join(self._root, pair_ids_filename)
         # pair_ids_filepath = os.path.join(self._root, pair_ids_filename)
 
         pkl_filename = self._opt.train_pkl_folder if self._is_for_train else self._opt.test_pkl_folder
@@ -444,141 +443,100 @@ def adaptive_personalize(opt, imitator, visualizer):
     imitator.post_personalize(opt.output_dir, loader, visualizer=None, verbose=True)
 
 
-def load_mixamo_smpl(mixamo_idx):
-    mixamo_root_path = '/root/A_dataset/mixamo'
-    dir_name = '%.4d' % mixamo_idx
-    pkl_path = os.path.join(mixamo_root_path, dir_name, 'result.pkl')
-
-    with open(pkl_path, 'rb') as f:
-        result = pickle.load(f)
-
-    anim_len = result['anim_len']
-    pose_array = result['smpl_array'].reshape(anim_len, -1)
-    cam_array = result['cam_array']
-    shape_array = np.ones((anim_len, 10))
-    smpl_array = np.concatenate((cam_array, pose_array, shape_array), axis=1)
-
-    return smpl_array
-
-
-MIXAMO_DANCE_ACTION_IDX_LIST = [78, 79, 102, 155, 159]
-MIXAMO_BASE_ACTION_IDX_LIST = [0, 8, 10, 20, 22, 32, 70, 96, 104, 148, 196, 228, 229]
-MIXAMO_ACROBAT_ACTION_IDX_LIST = [7, 24, 29, 31, 76, 83, 87, 120, 129, 130, 131, 132, 133, 134, 141, 142, 145, 161, 166, 177]
-
-
-def generate_actor_result(test_opt, src_img_path):
-    imitator = ModelsFactory.get_by_name(test_opt.model, test_opt)
-    src_img_name = os.path.split(src_img_path)[-1][:-4]
-    test_opt.src_path = src_img_path
-
-    if test_opt.post_tune:
-        adaptive_personalize(test_opt, imitator, visualizer=None)
-    else:
-        imitator.personalize(test_opt.src_path, visualizer=None)
-
-    action_list_dict = {'dance': MIXAMO_DANCE_ACTION_IDX_LIST,
-                        'base': MIXAMO_BASE_ACTION_IDX_LIST,
-                        'acrobat': MIXAMO_ACROBAT_ACTION_IDX_LIST}
-
-    for action_type in ['dance', 'base', 'acrobat']:
-        for i in action_list_dict[action_type]:
-            if test_opt.output_dir:
-                pred_output_dir = os.path.join(test_opt.output_dir, 'mixamo_preds')
-                os.system("rm -r %s" % pred_output_dir)
-                mkdir(pred_output_dir)
-            else:
-                pred_output_dir = None
-
-            print(pred_output_dir)
-            tgt_smpls = load_mixamo_smpl(i)
-
-            # dance_demo_id = 7
-            # video_info_pkl_path = '/root/impersonator_piao/input_video_data/dance_demo_%d_smooth_hmr_low_pass_smpl.pkl' % dance_demo_id
-            # with open(video_info_pkl_path, 'rb') as f:
-            #     video_info_list = pickle.load(f)
-            # tgt_smpls = [video_info['smpl_param'] for video_info in video_info_list]
-
-            imitator.inference_by_smpls(tgt_smpls, cam_strategy='smooth', output_dir=pred_output_dir, visualizer=None)
-
-            save_dir = os.path.join(test_opt.output_dir, src_img_name, action_type)
-            mkdir(save_dir)
-
-            output_mp4_path = os.path.join(save_dir, 'mixamo_%.4d_%s.mp4' % (i, src_img_name))
-            img_path_list = sorted(glob.glob('%s/*.jpg' % pred_output_dir))
-            make_video(output_mp4_path, img_path_list, save_frames_dir=None, fps=30)
-
-
-def create_T_pose_novel_view_smpl():
-    # cam + pose + shape
-    smpls = np.zeros((180, 75))
-
-    for i in range(180):
-        r1 = R.from_rotvec([0, 0, 0])
-        r2 = R.from_euler("xyz", [180, i * 2, 0], degrees=True)
-        r = (r1 * r2).as_rotvec()
-
-        smpls[i, 3:6] = r
-
-    return smpls
-
-
-def generate_T_pose_novel_view_result(test_opt, src_img_path):
-    imitator = ModelsFactory.get_by_name(test_opt.model, test_opt)
-    src_img_name = os.path.split(src_img_path)[-1][:-4]
-    test_opt.src_path = src_img_path
-
-    if test_opt.post_tune:
-        adaptive_personalize(test_opt, imitator, visualizer=None)
-    else:
-        imitator.personalize(test_opt.src_path, visualizer=None)
-
-    if test_opt.output_dir:
-        pred_output_dir = os.path.join(test_opt.output_dir, 'T_novel_view_preds')
-        os.system("rm -r %s" % pred_output_dir)
-        mkdir(pred_output_dir)
-    else:
-        pred_output_dir = None
-
-    print(pred_output_dir)
-    tgt_smpls = create_T_pose_novel_view_smpl()
-
-    imitator.inference_by_smpls(tgt_smpls, cam_strategy='smooth', output_dir=pred_output_dir, visualizer=None)
-
-    save_dir = os.path.join(test_opt.output_dir, src_img_name)
-    mkdir(save_dir)
-
-    output_mp4_path = os.path.join(save_dir, 'T_novel_view_%s.mp4' % (src_img_name))
-    img_path_list = sorted(glob.glob('%s/*.jpg' % pred_output_dir))
-    make_video(output_mp4_path, img_path_list, save_frames_dir=None, fps=30)
-
-
-def main():
-    # meta imitator
-    test_opt = TestOptions().parse()
-    test_opt.front_warp = False
-    test_opt.post_tune = False
-    test_opt.post_tune = True
-    test_opt.name = 'impersonator_mi_fashion_place'
-    test_opt.checkpoints_dir = '/public/liuwen/p300/models'
-
+def parse_view_params(view_params):
     """
-    mixamo
+    :param view_params: R=xxx,xxx,xxx/t=xxx,xxx,xxx
+    :return:
+        -R: np.ndarray, (3,)
+        -t: np.ndarray, (3,)
     """
-    demo_img_dir = 'good_actor/imper'
-    test_opt.output_dir = 'meta_train/result_%s' % os.path.split(demo_img_dir)[-1]
 
-    for src_img_path in tqdm(sorted(glob.glob("%s/*" % demo_img_dir))):
-        generate_actor_result(test_opt, src_img_path)
+    params = dict()
+    for segment in view_params.split('/'):
+        # R=xxx,xxx,xxx -> (name, xxx,xxx,xxx)
+        name, params_str = segment.split('=')
 
-    """
-    T pose novel view
-    """
-    # demo_img_dir = 'good_actor/man'
-    # test_opt.output_dir = 'meta_train/T_novel_view_result_%s' % os.path.split(demo_img_dir)[-1]
-    #
-    # for src_img_path in tqdm(sorted(glob.glob("%s/*" % demo_img_dir))):
-    #     generate_T_pose_novel_view_result(test_opt, src_img_path)
+        vals = [float(val) for val in params_str.split(',')]
+
+        params[name] = np.array(vals, dtype=np.float32)
+
+    params['R'] = params['R'] / 180 * np.pi
+    return params
+
+
+def tensor2cv2(img_tensor):
+    img = (img_tensor[0].detach().cpu().numpy().transpose(1, 2, 0) + 1) / 2
+    img = img[:, :, ::-1]
+    img = (img * 255).astype(np.uint8)
+
+    return img
 
 
 if __name__ == "__main__":
-    main()
+
+    opt = TestOptions().parse()
+    src_path_list = sorted(glob.glob("good_actor/man/*"))
+    # src_path_list = ['good_actor/imper_view/009_5_2_0100.jpg']
+
+    for src_path in src_path_list:
+
+        # opt.src_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
+        opt.src_path = src_path
+        # opt.tgt_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
+        opt.front_warp = False
+        opt.visual = True
+        opt.post_tune = True
+
+        # set imitator
+        viewer = ModelsFactory.get_by_name(opt.model, opt)
+
+        if opt.visual:
+            visualizer = MotionImitationVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
+        else:
+            visualizer = None
+
+        if opt.post_tune:
+            adaptive_personalize(opt, viewer, visualizer)
+
+        viewer.personalize(opt.src_path, visualizer=visualizer)
+        print('\n\t\t\tPersonalization: completed...')
+
+        src_path = opt.src_path
+        view_params = opt.view_params
+        params = parse_view_params(view_params)
+
+        length = 180
+        delta = 360 / length
+        pred_outs = []
+        logger = tqdm(range(length))
+
+        src_img_true_name = os.path.split(opt.src_path)[-1][:-4]
+        save_dir = 'meta_train/novel_view_result/%s' % src_img_true_name
+        os.makedirs(os.path.join(save_dir, 'imgs'), exist_ok=True)
+
+        print('\n\t\t\tSynthesizing {} novel views'.format(length))
+        for i in logger:
+            params['R'][0] = 0
+            params['R'][1] = delta * i / 180.0 * np.pi
+            params['R'][2] = 0
+
+            preds = viewer.view(params['R'], params['t'], visualizer=None, name=str(i))
+            # pred_outs.append(preds)
+
+            save_img_name = '%s.%d.jpg' % (os.path.split(opt.src_path)[-1], delta * i)
+
+            cv2.imwrite('%s/imgs/%s' % (save_dir, save_img_name), tensor2cv2(preds))
+
+        """
+        make video
+        """
+        img_path_list = glob.glob("%s/imgs/*.jpg" % save_dir)
+        output_mp4_path = '%s/%s.mp4' % (save_dir, src_img_true_name)
+        make_video(output_mp4_path, img_path_list, save_frames_dir=None, fps=30)
+
+        # logger.set_description(
+        #     'view = ({:.3f}, {:.3f}, {:.3f})'.format(params['R'][0], params['R'][1], params['R'][2])
+        # )
+
+        # pred_outs = torch.cat(pred_outs, dim=0)
+        # visualizer.vis_named_img('preds_%d' % (delta * i), preds)
