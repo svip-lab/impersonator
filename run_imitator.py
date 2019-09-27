@@ -13,6 +13,10 @@ from utils.util import load_pickle_file, write_pickle_file, mkdirs, mkdir, clear
 import utils.cv_utils as cv_utils
 
 
+__all__ = ['write_pair_info', 'scan_tgt_paths', 'meta_imitate',
+           'MetaCycleDataSet', 'make_dataset', 'adaptive_personalize']
+
+
 @torch.no_grad()
 def write_pair_info(src_info, tsf_info, out_file, imitator, only_vis):
     """
@@ -224,7 +228,7 @@ if __name__ == "__main__":
     print('\n\t\t\tPersonalization: completed...')
 
     if test_opt.save_res:
-        pred_output_dir = mkdir(os.path.join(test_opt.output_dir, 'preds'))
+        pred_output_dir = mkdir(os.path.join(test_opt.output_dir, 'imitators'))
         pred_output_dir = clear_dir(pred_output_dir)
     else:
         pred_output_dir = None

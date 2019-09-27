@@ -9,7 +9,7 @@ class BaseOptions(object):
         self._initialized = False
 
     def initialize(self):
-        self._parser.add_argument('--checkpoints_dir', type=str, default='/p300/model_ckpts',
+        self._parser.add_argument('--checkpoints_dir', type=str, default='./outputs/checkpoints/',
                                   help='models are saved here')
 
         self._parser.add_argument('--data_dir', type=str, default='/p300/datasets/iPER', help='path to dataset')
@@ -41,7 +41,7 @@ class BaseOptions(object):
         self._parser.add_argument('--cond_nc', type=int, default=3, help='# of conditions')
         self._parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self._parser.add_argument('--model', type=str, default='impersonator', help='model to run')
-        self._parser.add_argument('--name', type=str, default='experiment_1',
+        self._parser.add_argument('--name', type=str, default='running',
                                   help='name of the experiment. It decides where to store samples and models')
         self._parser.add_argument('--gen_name', type=str, default='impersonator',
                                   help='chooses generator to be used, resnet or unet')

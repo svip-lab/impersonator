@@ -1,11 +1,11 @@
-from models.models import ModelsFactory
-from options.test_options import TestOptions
-from utils.visdom_visualizer import VisdomVisualizer
-
 import cv2
-import glob
 import os
 import numpy as np
+
+from models.swapper import Swapper
+from options.test_options import TestOptions
+from utils.visdom_visualizer import VisdomVisualizer
+from utils.util import mkdir
 
 
 def tensor2cv2(img_tensor):
@@ -19,40 +19,28 @@ def tensor2cv2(img_tensor):
 if __name__ == "__main__":
 
     opt = TestOptions().parse()
-    # opt.src_path = 'meta_train/samples/all_img/men1_256.jpg'
-    # opt.tgt_path = 'meta_train/samples/all_img/8_256.jpg'
-
-    # opt.src_path = 'good_actor/woman/fashionWOMENBlouses_Shirtsid0000694703_4full.jpg'
-    # opt.src_path = 'good_actor/woman/Sweaters-id_0000363204_4_full.jpg'
-    # opt.src_path = 'good_actor/man/Jackets_Vests-id_0000190301_4_full.jpg'
-    # opt.src_path = 'good_actor/woman/Sweaters-id_0000337302_4_full.jpg'
-    opt.src_path = 'good_actor/imper/000.jpg'
-
-    # opt.tgt_path = 'good_actor/woman/fashionWOMENBlouses_Shirtsid0000695303_4full.jpg'
-    # opt.tgt_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
-    # opt.tgt_path = 'good_actor/man/Jackets_Vests-id_0000190301_4_full.jpg'
-    # opt.tgt_path = 'good_actor/man/Jackets_Vests-id_0000009401_4_full.jpg'
-    opt.tgt_path = 'good_actor/woman/fashionWOMENDressesid0000271801_4full.jpg'
-    # opt.tgt_path = 'good_actor/imper/000.jpg'
-    # opt.tgt_path = 'good_actor/woman/Sweaters-id_0000337302_4_full.jpg'
-
+    opt.bg_ks = 25
     opt.front_warp = True
-    opt.visual = True
     opt.post_tune = True
 
-    tgt_path_list = sorted(glob.glob("good_actor/*/*"))
-    src_path_list = sorted(glob.glob("good_actor/imper/*"))
+    src_path_list = [('iPER',    './assets/src_imgs/imper_A_Pose/009_5_1_000.jpg'),
+                     ('Fashion', './assets/src_imgs/fashion_man/Jackets_Vests-id_0000008408_4_full.jpg'),
+                     ('Fashion', './assets/src_imgs/fashion_woman/Sweaters-id_0000088807_4_full.jpg')]
 
-    for src_path in src_path_list:
+    tgt_path_list = ['./assets/src_imgs/fashion_woman/fashionWOMENBlouses_Shirtsid0000666802_4full.jpg',
+                     './assets/src_imgs/fashion_man/Sweatshirts_Hoodies-id_0000680701_4_full.jpg',
+                     './assets/src_imgs/fashion_man/Sweatshirts_Hoodies-id_0000097801_4_full.jpg']
+
+    for (dataset, src_path) in src_path_list:
         opt.src_path = src_path
 
         for tgt_path in tgt_path_list:
             opt.tgt_path = tgt_path
 
             # set imitator
-            swapper = ModelsFactory.get_by_name(opt.model, opt)
+            swapper = Swapper(opt)
 
-            if opt.visual:
+            if opt.ip:
                 visualizer = VisdomVisualizer(env=opt.name, ip=opt.ip, port=opt.port)
             else:
                 visualizer = None
@@ -73,12 +61,12 @@ if __name__ == "__main__":
             result = swapper.swap(src_info=swapper.src_info, tgt_info=swapper.tsf_info, target_part=opt.swap_part,
                                   visualizer=visualizer)
             # else b->a
-            # swapper.swap(src_info=swapper.tgt_info, tgt_info=swapper.src_info, target_part=opt.swap_part, visualizer=visualizer)
+            # swapper.swap(src_info=swapper.tsf_info, tgt_info=swapper.src_info, target_part=opt.swap_part,
+            #              visualizer=visualizer)
 
             src_img_true_name = os.path.split(opt.src_path)[-1][:-4]
 
-            save_dir = 'meta_train/swap_result/%s' % src_img_true_name
-            os.makedirs(save_dir, exist_ok=True)
+            save_dir = mkdir('./outputs/results/demos/swappers/%s' % src_img_true_name)
             save_img_name = '%s.%s' % (os.path.split(opt.src_path)[-1], os.path.split(opt.tgt_path)[-1])
 
             cv2.imwrite('%s/%s' % (save_dir, save_img_name), tensor2cv2(result))

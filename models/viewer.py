@@ -4,13 +4,10 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
-# from utils.nmr import SMPLRenderer
 from utils.nmr import SMPLRenderer
 from utils.detectors import PersonMaskRCNNDetector
 import utils.cv_utils as cv_utils
 import utils.util as util
-
-import ipdb
 
 
 class Viewer(BaseModel):
@@ -286,7 +283,10 @@ class Viewer(BaseModel):
         tsf_img = F.grid_sample(src_info['img'], T)
         tsf_inputs = torch.cat([tsf_img, tsf_cond], dim=1)
 
-        bg = torch.zeros_like(src_info['bg'])
+        if not self._opt.bg_replace:
+            bg = torch.zeros_like(src_info['bg'])
+        else:
+            bg = src_info['bg']
         preds, tsf_mask = self.forward(tsf_inputs, src_info['feats'], T, bg)
 
         if self._opt.front_warp:
@@ -323,7 +323,6 @@ class Viewer(BaseModel):
             j2ds = sample['j2d'].cuda()  # (N, 4)
             T = sample['T'].cuda()  # (N, h, w, 2)
             T_cycle = sample['T_cycle'].cuda()  # (N, h, w, 2)
-            bg_inputs = sample['bg_inputs'].cuda()  # (N, 4, h, w)
             src_inputs = sample['src_inputs'].cuda()  # (N, 6, h, w)
             tsf_inputs = sample['tsf_inputs'].cuda()  # (N, 6, h, w)
             src_fim = sample['src_fim'].cuda()
@@ -335,22 +334,18 @@ class Viewer(BaseModel):
             pseudo_masks = torch.cat([pseudo_masks[:, 0, ...], pseudo_masks[:, 1, ...]],
                                      dim=0).cuda()  # (2N, 1, h, w)
 
-            return src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, \
+            return src_fim, tsf_fim, j2ds, T, T_cycle, \
                    src_inputs, tsf_inputs, images, init_preds, pseudo_masks
 
         def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
-            # set cycle bg inputs
-            tsf_bg_mask = tsf_inputs[:, -1:, ...]
-            cycle_bg_inputs = torch.cat([fake_tsf_imgs * (1 - tsf_bg_mask), tsf_bg_mask], dim=1)
-
             # set cycle src inputs
-            cycle_src_inputs = torch.cat([fake_tsf_imgs * tsf_bg_mask, tsf_inputs[:, 3:]], dim=1)
+            cycle_src_inputs = torch.cat([fake_tsf_imgs * tsf_inputs[:, -1:, ...], tsf_inputs[:, 3:]], dim=1)
 
             # set cycle tsf inputs
             cycle_tsf_img = F.grid_sample(fake_tsf_imgs, T_cycle)
             cycle_tsf_inputs = torch.cat([cycle_tsf_img, src_inputs[:, 3:]], dim=1)
 
-            return cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs
+            return cycle_src_inputs, cycle_tsf_inputs
 
         def warp(preds, tsf, fim, fake_tsf_mask):
             front_mask = self.render.encode_front_fim(fim, transpose=True)
@@ -358,9 +353,9 @@ class Viewer(BaseModel):
             # preds = torch.clamp(preds + tsf * front_mask, -1, 1)
             return preds
 
-        def inference(bg_inputs, src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
-            fake_bg, fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
-                self.generator.forward(bg_inputs, src_inputs, tsf_inputs, T=T)
+        def inference(src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
+            fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
+                self.generator.infer_front(src_inputs, tsf_inputs, T=T)
 
             fake_src_imgs = fake_src_mask * bg_inpaint + (1 - fake_src_mask) * fake_src_color
             fake_tsf_imgs = fake_tsf_mask * bg_inpaint + (1 - fake_tsf_mask) * fake_tsf_color
@@ -368,11 +363,11 @@ class Viewer(BaseModel):
             if self._opt.front_warp:
                 fake_tsf_imgs = warp(fake_tsf_imgs, tsf_inputs[:, 0:3], tsf_fim, fake_tsf_mask)
 
-            cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs = set_cycle_inputs(
+            cycle_src_inputs, cycle_tsf_inputs = set_cycle_inputs(
                 fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle)
 
-            cycle_bg, cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
-                self.generator.forward(cycle_bg_inputs, cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
+            cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
+                self.generator.infer_front(cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
 
             cycle_src_imgs = cycle_src_mask * bg_inpaint + (1 - cycle_src_mask) * cycle_src_color
             cycle_tsf_imgs = cycle_tsf_mask * bg_inpaint + (1 - cycle_tsf_mask) * cycle_tsf_color
@@ -389,23 +384,6 @@ class Viewer(BaseModel):
 
             return face_criterion, idt_criterion, mask_criterion
 
-        def print_losses(*args, **kwargs):
-
-            print('epoch = {}, step = {}'.format(kwargs['epoch'], kwargs['step']))
-            for key, value in kwargs.items():
-                if key == 'epoch' or key == 'step':
-                    continue
-                print('\t{}, {:.6f}'.format(key, value.item()))
-
-        def update_learning_rate(optimizer, current_lr, init_lr, final_lr, nepochs_decay):
-            # updated learning rate G
-            lr_decay = (init_lr - final_lr) / nepochs_decay
-            current_lr -= lr_decay
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = current_lr
-            print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
-            return current_lr
-
         init_lr = 0.0002
         nodecay_epochs = 5
         optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
@@ -415,14 +393,14 @@ class Viewer(BaseModel):
         logger = tqdm(range(nodecay_epochs))
         for epoch in logger:
             for i, sample in enumerate(data_loader):
-                src_fim, tsf_fim, j2ds, T, T_cycle, bg_inputs, src_inputs, tsf_inputs, \
+                src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, \
                 images, init_preds, pseudo_masks = set_gen_inputs(sample)
 
                 # print(bg_inputs.shape, src_inputs.shape, tsf_inputs.shape)
                 bs = tsf_inputs.shape[0]
                 src_imgs = images[0:bs]
                 fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask = inference(
-                    bg_inputs, src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
+                    src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim)
 
                 # cycle reconstruction loss
                 cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)
@@ -447,9 +425,6 @@ class Viewer(BaseModel):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
-                # print_losses(epoch=epoch, step=step, total=loss, cyc=cycle_loss,
-                #              str=struct_loss, fid=fid_loss, msk=mask_loss)
 
                 if verbose:
                     logger.set_description(

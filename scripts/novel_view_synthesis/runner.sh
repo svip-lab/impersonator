@@ -1,8 +1,7 @@
 #! /bin/bash
 
 # choose other inputs src img and reference images
-src_path="./assets/samples/src_imgs/men1_256.jpg"
-tgt_path="./assets/samples/src_imgs/8_256.jpg"
+src_path="./assets/src_imgs/internet/men1_256.jpg"
 
 
 ##
@@ -26,18 +25,16 @@ bg_model="./outputs/checkpoints/deepfillv2/net_epoch_50_id_G.pth"
 ## otherwise, it will use the BGNet in the original LiquidWarping GAN
 #bg_model="ORIGINAL"
 
-python run_swap.py --gpu_ids ${gpu} \
-    --model swapper \
+python run_view.py --gpu_ids ${gpu} \
+    --model viewer \
     --gen_name impersonator \
     --image_size 256 \
-    --swap_part body \
-    --name ${name}   \
+    --name ${name}  \
     --checkpoints_dir ${checkpoints_dir} \
     --bg_model ${bg_model}      \
     --load_path ${load_path}    \
     --output_dir ${output_dir}  \
     --src_path   ${src_path}    \
-    --tgt_path   ${tgt_path}    \
-    --bg_ks 7 --ft_ks 3         \
-    --has_detector  --post_tune  --front_warp --save_res  \
+    --bg_ks 11 --ft_ks 3         \
+    --has_detector  --post_tune  --front_warp --bg_replace --save_res  \
     --ip http://10.10.10.100 --port 31102

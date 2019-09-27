@@ -4,20 +4,26 @@ from .base_options import BaseOptions
 class TestOptions(BaseOptions):
     def initialize(self):
         BaseOptions.initialize(self)
-        self._parser.add_argument('--output_dir', type=str, default='/p300/poseGANs', help='output path')
-        self._parser.add_argument('--load_path', type=str, default='', help='pretrained model path')
+        self._parser.add_argument('--output_dir', type=str, default='./outputs/results/',
+                                  help='output directory to save the results')
         self._parser.add_argument('--src_path', type=str, default='', help='source image path')
         self._parser.add_argument('--tgt_path', type=str, default='', help='target image path')
-        self._parser.add_argument('--ref_path', type=str, default='', help='reference image path')
-        self._parser.add_argument('--pri_path', type=str, default='./assets/samples/prior_imgs/imgs',
+        self._parser.add_argument('--pri_path', type=str, default='./assets/samples/A_priors/imgs',
                                   help='prior image path')
 
-        self._parser.add_argument('--bg_model', type=str, default='ORIGINAL',
+        self._parser.add_argument('--load_path', type=str,
+                                  default='./outputs/checkpoints/lwb_imper_fashion_place/net_epoch_30_id_G.pth',
+                                  help='pretrained model path')
+
+        self._parser.add_argument('--bg_model', type=str,
+                                  default='./outputs/checkpoints/deepfillv2/net_epoch_50_id_G.pth',
                                   help='if it is `ORIGINAL`, it will use the '
                                        'original BGNet of the generator of LiquidWarping GAN, '
-                                       'otherwise, it will use a pretrain deepfillv2')
-        self._parser.add_argument('--bg_ks', default=13, type=int, help='dilate kernel size.')
-        self._parser.add_argument('--ft_ks', default=3, type=int, help='dilate kernel size.')
+                                       'otherwise, set it as `./outputs/checkpoints/deepfillv2/net_epoch_50_id_G.pth`, '
+                                       'and it will use a pretrained deepfillv2 background inpaintor (default).')
+
+        self._parser.add_argument('--bg_ks', default=13, type=int, help='dilate kernel size of background mask.')
+        self._parser.add_argument('--ft_ks', default=3, type=int, help='dilate kernel size of front mask.')
         self._parser.add_argument('--only_vis', action="store_true", default=False, help='only visible or not')
         self._parser.add_argument('--has_detector', action='store_true', help='use mask rcnn or not')
         self._parser.add_argument('--body_seg', action="store_true", default=False,
@@ -31,9 +37,10 @@ class TestOptions(BaseOptions):
                                        'betwwen the source and reference image.')
 
         # Human appearance transfer
-        self._parser.add_argument('--swap_part', type=str, default='upper_body', help='part to swap')
+        self._parser.add_argument('--swap_part', type=str, default='body', help='part to swap')
 
         # Novel view synthesis
+        self._parser.add_argument('--T_pose', action="store_true", default=False, help='view as T pose or not.')
         self._parser.add_argument('--view_params', type=str, default='R=0,90,0/t=0,0,0', help='params of novel view.')
 
         # visualizer

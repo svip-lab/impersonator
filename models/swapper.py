@@ -228,9 +228,8 @@ class Swapper(BaseModel):
         preds, tsf_mask = self.forward(tsf_inputs, tgt_info['feats'], T21, src_info['feats'], T11, src_info['bg'])
 
         if self._opt.front_warp:
-            preds = tsf11 * src_left_mask + (1 - src_left_mask) * preds
-
-            # preds = self.warp_front(preds, src_info['img'], src_info['fim'], tsf_mask)
+            # preds = tsf11 * src_left_mask + (1 - src_left_mask) * preds
+            preds = self.warp(preds, src_info['img'], src_info['fim'], tsf_mask)
 
         if visualizer is not None:
             self.visualize(visualizer, src_img=src_info['img'], tgt_img=tgt_info['img'], preds=preds)
