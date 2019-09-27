@@ -15,7 +15,5 @@ Fix some bugs and update the `post_personalize` function of each task, replacing
 
 ### ImPer-1.2.1
 * add the training document [train.md](../doc/train.md).
-
-### Imper-1.2.2
 * **TODO**: convert all `*.pkl` of smpl files in iPER to `.h5`. This will reduce the loading time.
 * **TODO**: add h5 file Dataset. 
