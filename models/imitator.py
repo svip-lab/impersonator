@@ -5,13 +5,10 @@ import numpy as np
 from tqdm import tqdm
 from .models import BaseModel
 from networks.networks import NetworksFactory, HumanModelRecovery
-# from utils.nmr import SMPLRenderer
 from utils.nmr import SMPLRenderer
 from utils.detectors import PersonMaskRCNNDetector
 import utils.cv_utils as cv_utils
 import utils.util as util
-
-import ipdb
 
 
 class Imitator(BaseModel):
@@ -120,6 +117,7 @@ class Imitator(BaseModel):
             bbox, body_mask = self.detector.inference(img[0])
             bg_mask = 1 - body_mask
         else:
+            # bg is 1, ft is 0
             bg_mask = util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.bg_ks, mode='erode')
             body_mask = 1 - bg_mask
 
@@ -129,7 +127,6 @@ class Imitator(BaseModel):
             incomp_img = img * bg_mask
             bg_inputs = torch.cat([incomp_img, bg_mask], dim=1)
             img_bg = self.bgnet(bg_inputs)
-            src_info['bg_inputs'] = bg_inputs
             # src_info['bg'] = bg_inputs[:, 0:3] + img_bg * bg_inputs[:, -1:]
             src_info['bg'] = img_bg
 
@@ -158,11 +155,12 @@ class Imitator(BaseModel):
         return theta
 
     @torch.no_grad()
-    def inference(self, tgt_paths, tgt_smpls=None, cam_strategy='smooth', output_dir='', visualizer=None, verbose=True):
+    def inference(self, tgt_paths, tgt_smpls=None, cam_strategy='smooth',
+                  output_dir='', visualizer=None, verbose=True):
+
         length = len(tgt_paths)
 
         outputs = []
-
         process_bar = tqdm(range(length)) if verbose else range(length)
 
         for t in process_bar:
@@ -189,8 +187,32 @@ class Imitator(BaseModel):
                                       image_size=self._opt.image_size)
 
         return outputs
-
+    
     @torch.no_grad()
+    def inference_by_smpls(self, tgt_smpls, cam_strategy='smooth', output_dir='', visualizer=None):
+        length = len(tgt_smpls)
+
+        outputs = []
+        for t in tqdm(range(length)):
+            tgt_smpl = tgt_smpls[t] if tgt_smpls is not None else None
+
+            tsf_inputs = self.transfer_params_by_smpl(tgt_smpl, cam_strategy, t=t)
+            preds = self.forward(tsf_inputs, self.tsf_info['T'])
+
+            if visualizer is not None:
+                gt = cv_utils.transform_img(self.tsf_info['image'], image_size=self._opt.image_size, transpose=True)
+                visualizer.vis_named_img('pred_' + cam_strategy, preds)
+                visualizer.vis_named_img('gt', gt[None, ...], denormalize=False)
+
+            preds = preds[0].permute(1, 2, 0)
+            preds = preds.cpu().numpy()
+            outputs.append(preds)
+
+            if output_dir:
+                cv_utils.save_cv2_img(preds, os.path.join(output_dir, 'pred_%.8d.jpg' % t), normalize=True)
+
+        return outputs
+
     def swap_smpl(self, src_cam, src_shape, tgt_smpl, cam_strategy='smooth'):
         tgt_cam = tgt_smpl[:, 0:3].contiguous()
         pose = tgt_smpl[:, 3:75].contiguous()
@@ -211,18 +233,12 @@ class Imitator(BaseModel):
 
         return tsf_smpl
 
-    @torch.no_grad()
-    def transfer_params(self, tgt_path, tgt_smpl=None, cam_strategy='smooth', t=0):
+    def transfer_params_by_smpl(self, tgt_smpl, cam_strategy='smooth', t=0):
         # get source info
         src_info = self.src_info
 
-        ori_img = cv_utils.read_cv2_img(tgt_path)
-        if tgt_smpl is None:
-            img_hmr = cv_utils.transform_img(ori_img, 224, transpose=True) * 2 - 1.0
-            img_hmr = torch.tensor(img_hmr, dtype=torch.float32).cuda()[None, ...]
-            tgt_smpl = self.hmr(img_hmr)
-        else:
-            tgt_smpl = torch.tensor(tgt_smpl, dtype=torch.float32).cuda()[None, ...]
+        if isinstance(tgt_smpl, np.ndarray):
+            tgt_smpl = torch.tensor(tgt_smpl).float().cuda()[None, ...]
 
         if t == 0 and cam_strategy == 'smooth':
             self.first_cam = tgt_smpl[:, 0:3].clone()
@@ -245,12 +261,67 @@ class Imitator(BaseModel):
 
         # add target image to tsf info
         tsf_info['tsf_img'] = tsf_img
-        tsf_info['image'] = ori_img
         tsf_info['T'] = T
 
         self.tsf_info = tsf_info
 
         return tsf_inputs
+
+    def transfer_params(self, tgt_path, tgt_smpl=None, cam_strategy='smooth', t=0):
+        ori_img = cv_utils.read_cv2_img(tgt_path)
+        if tgt_smpl is None:
+            img_hmr = cv_utils.transform_img(ori_img, 224, transpose=True) * 2 - 1.0
+            img_hmr = torch.tensor(img_hmr, dtype=torch.float32).cuda()[None, ...]
+            tgt_smpl = self.hmr(img_hmr)
+        else:
+            if isinstance(tgt_smpl, np.ndarray):
+                tgt_smpl = torch.tensor(tgt_smpl, dtype=torch.float32).cuda()[None, ...]
+
+        tsf_inputs = self.transfer_params_by_smpl(tgt_smpl=tgt_smpl, cam_strategy=cam_strategy, t=t)
+        self.tsf_info['image'] = ori_img
+
+        return tsf_inputs
+
+    # @torch.no_grad()
+    # def transfer_params(self, tgt_path, tgt_smpl=None, cam_strategy='smooth', t=0):
+    #     # get source info
+    #     src_info = self.src_info
+    #
+    #     ori_img = cv_utils.read_cv2_img(tgt_path)
+    #     if tgt_smpl is None:
+    #         img_hmr = cv_utils.transform_img(ori_img, 224, transpose=True) * 2 - 1.0
+    #         img_hmr = torch.tensor(img_hmr, dtype=torch.float32).cuda()[None, ...]
+    #         tgt_smpl = self.hmr(img_hmr)
+    #     else:
+    #         tgt_smpl = torch.tensor(tgt_smpl, dtype=torch.float32).cuda()[None, ...]
+    #
+    #     if t == 0 and cam_strategy == 'smooth':
+    #         self.first_cam = tgt_smpl[:, 0:3].clone()
+    #
+    #     # get transfer smpl
+    #     tsf_smpl = self.swap_smpl(src_info['cam'], src_info['shape'], tgt_smpl, cam_strategy=cam_strategy)
+    #     # transfer process, {'theta', 'cam', 'pose', 'shape', 'verts', 'j2d', 'j3d'}
+    #     tsf_info = self.hmr.get_details(tsf_smpl)
+    #
+    #     tsf_f2verts, tsf_fim, tsf_wim = self.render.render_fim_wim(tsf_info['cam'], tsf_info['verts'])
+    #     # src_f2pts = src_f2verts[:, :, :, 0:2]
+    #     tsf_info['fim'] = tsf_fim
+    #     tsf_info['wim'] = tsf_wim
+    #     tsf_info['cond'], _ = self.render.encode_fim(tsf_info['cam'], tsf_info['verts'], fim=tsf_fim, transpose=True)
+    #     # tsf_info['sil'] = util.morph((tsf_fim != -1).float(), ks=self._opt.ft_ks, mode='dilate')
+    #
+    #     T = self.render.cal_bc_transform(src_info['p2verts'], tsf_fim, tsf_wim)
+    #     tsf_img = F.grid_sample(src_info['img'], T)
+    #     tsf_inputs = torch.cat([tsf_img, tsf_info['cond']], dim=1)
+    #
+    #     # add target image to tsf info
+    #     tsf_info['tsf_img'] = tsf_img
+    #     tsf_info['image'] = ori_img
+    #     tsf_info['T'] = T
+    #
+    #     self.tsf_info = tsf_info
+    #
+    #     return tsf_inputs
 
     def forward(self, tsf_inputs, T):
         bg_img = self.src_info['bg']
@@ -375,7 +446,8 @@ class Imitator(BaseModel):
                            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
 
                 # mask loss
-                mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+                # mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+                mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), pseudo_masks)
 
                 loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
                 optimizer.zero_grad()

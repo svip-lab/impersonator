@@ -18,7 +18,7 @@ class DatasetFactory(object):
 
     @staticmethod
     def get_by_name(dataset_name, opt, is_for_train):
-        if dataset_name == 'imper':
+        if dataset_name == 'iPER':
             from data.imper_dataset import ImPerDataset
             dataset = ImPerDataset(opt, is_for_train)
 
@@ -26,11 +26,11 @@ class DatasetFactory(object):
             from data.fashion_dataset import FashionPairDataset
             dataset = FashionPairDataset(opt, is_for_train)
 
-        elif dataset_name == 'imper_place':
+        elif dataset_name == 'iPER_place':
             from data.imper_fashion_place_dataset import ImPerPlaceDataset
             dataset = ImPerPlaceDataset(opt, is_for_train)
 
-        elif dataset_name == 'imper_fashion_place':
+        elif dataset_name == 'iPER_fashion_place':
             from data.imper_fashion_place_dataset import ImPerFashionPlaceDataset
             dataset = ImPerFashionPlaceDataset(opt, is_for_train)
 

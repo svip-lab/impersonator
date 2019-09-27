@@ -9,18 +9,21 @@ class BaseOptions(object):
         self._initialized = False
 
     def initialize(self):
-        self._parser.add_argument('--data_dir', type=str, default='/p300/human_pose/processed', help='path to dataset')
-        self._parser.add_argument('--dataset_mode', type=str, default='mi', help='chooses dataset to be used')
-        self._parser.add_argument('--train_ids_file', type=str, default='MI_train.txt', help='file containing train ids')
-        self._parser.add_argument('--test_ids_file', type=str, default='MI_val.txt', help='file containing test ids')
-        self._parser.add_argument('--images_folder', type=str, default='motion_transfer_HD', help='images folder')
-        self._parser.add_argument('--smpls_folder', type=str, default='motion_transfer_smpl', help='smpls folder')
+        self._parser.add_argument('--checkpoints_dir', type=str, default='./outputs/checkpoints/',
+                                  help='models are saved here')
 
+        self._parser.add_argument('--data_dir', type=str, default='/p300/datasets/iPER', help='path to dataset')
+        self._parser.add_argument('--dataset_mode', type=str, default='iPER', help='chooses dataset to be used')
+        self._parser.add_argument('--train_ids_file', type=str, default='train.txt', help='file containing train ids')
+        self._parser.add_argument('--test_ids_file', type=str, default='val.txt', help='file containing test ids')
+        self._parser.add_argument('--images_folder', type=str, default='images_HD', help='images folder')
+        self._parser.add_argument('--smpls_folder', type=str, default='smpls', help='smpls folder')
+
+        self._parser.add_argument('--map_name', type=str, default='uv_seg', help='mapping function')
         self._parser.add_argument('--part_info', type=str, default='assets/pretrains/smpl_part_info.json',
                                   help='smpl part info path.')
         self._parser.add_argument('--uv_mapping', type=str, default='assets/pretrains/mapper.txt',
                                   help='uv mapping.')
-        self._parser.add_argument('--map_name', type=str, default='uv_seg', help='mapping function')
         self._parser.add_argument('--hmr_model', type=str, default='assets/pretrains/hmr_tf2pt.pth',
                                   help='pretrained hmr model path.')
         self._parser.add_argument('--smpl_model', type=str, default='assets/pretrains/smpl_model.pkl',
@@ -38,14 +41,13 @@ class BaseOptions(object):
         self._parser.add_argument('--cond_nc', type=int, default=3, help='# of conditions')
         self._parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self._parser.add_argument('--model', type=str, default='impersonator', help='model to run')
-        self._parser.add_argument('--name', type=str, default='experiment_1',
+        self._parser.add_argument('--name', type=str, default='running',
                                   help='name of the experiment. It decides where to store samples and models')
         self._parser.add_argument('--gen_name', type=str, default='impersonator',
                                   help='chooses generator to be used, resnet or unet')
         self._parser.add_argument('--norm_type', type=str, default='instance',
                                   help='choose use what norm layer in discriminator')
         self._parser.add_argument('--n_threads_test', default=2, type=int, help='# threads for loading data')
-        self._parser.add_argument('--checkpoints_dir', type=str, default='/p300/shadow', help='models are saved here')
         self._parser.add_argument('--serial_batches', action='store_true',
                                   help='if true, takes images in order to make batches, otherwise takes them randomly')
         self._parser.add_argument('--do_saturate_mask', action="store_true",

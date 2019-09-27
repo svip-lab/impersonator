@@ -228,9 +228,8 @@ class Swapper(BaseModel):
         preds, tsf_mask = self.forward(tsf_inputs, tgt_info['feats'], T21, src_info['feats'], T11, src_info['bg'])
 
         if self._opt.front_warp:
-            preds = tsf11 * src_left_mask + (1 - src_left_mask) * preds
-
-            # preds = self.warp_front(preds, src_info['img'], src_info['fim'], tsf_mask)
+            # preds = tsf11 * src_left_mask + (1 - src_left_mask) * preds
+            preds = self.warp(preds, src_info['img'], src_info['fim'], tsf_mask)
 
         if visualizer is not None:
             self.visualize(visualizer, src_img=src_info['img'], tgt_img=tgt_info['img'], preds=preds)
@@ -318,7 +317,12 @@ class Swapper(BaseModel):
 
             src_inputs = torch.cat([s2t_inputs, t2s_inputs], dim=0)
 
-            return src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, images, init_preds
+            src_mask = util.morph(src_inputs[:, -1:, ], ks=self._opt.ft_ks, mode='erode')
+            tsf_mask = util.morph(tsf_inputs[:, -1:, ], ks=self._opt.ft_ks, mode='erode')
+
+            pseudo_masks = torch.cat([src_mask, tsf_mask], dim=0)
+
+            return src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, images, init_preds, pseudo_masks
 
         def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
             # set cycle bg inputs
@@ -390,7 +394,8 @@ class Swapper(BaseModel):
         face_cri, idt_cri, msk_cri = create_criterion()
 
         # set up inputs
-        src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, src_imgs, init_preds = set_inputs(
+        src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, \
+        src_imgs, init_preds, pseudo_masks = set_inputs(
             src_info=self.src_info, tsf_info=self.tsf_info
         )
 
@@ -420,10 +425,11 @@ class Swapper(BaseModel):
             #            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
 
             fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
-                    face_cri(tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+                       face_cri(tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
 
             # mask loss
-            mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+            # mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+            mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), pseudo_masks)
 
             loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
             optimizer.zero_grad()
