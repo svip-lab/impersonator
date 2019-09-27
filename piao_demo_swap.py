@@ -8,7 +8,7 @@ import cv2
 import glob
 import os
 import numpy as np
-from tools.video import make_video
+from utils.video import make_video
 
 
 def tensor2cv2(img_tensor):
