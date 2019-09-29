@@ -94,11 +94,11 @@ def main():
 
     test_opt.output_dir = mkdir('./outputs/results/demos/imitators')
     # source images from iPER
-    iamges_paths = ['./assets/src_imgs/imper_A_Pose/009_5_1_000.jpg',
+    images_paths = ['./assets/src_imgs/imper_A_Pose/009_5_1_000.jpg',
                     './assets/src_imgs/imper_A_Pose/024_8_2_0000.jpg',
                     './assets/src_imgs/fashion_woman/Sweaters-id_0000088807_4_full.jpg']
 
-    for src_img_path in tqdm(iamges_paths):
+    for src_img_path in tqdm(images_paths):
         generate_actor_result(test_opt, src_img_path)
 
     # clean other files
