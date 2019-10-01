@@ -24,6 +24,7 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least 8GB GPU memory and other requirements.
+All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and other platforms have not been tested yet.
 ### Requirements
 ``` bash
 pip install -r requirements.txt
