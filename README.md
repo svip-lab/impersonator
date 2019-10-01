@@ -129,6 +129,14 @@ The details of each running scripts are shown in [runDetails.md](doc/runDetails.
 ### Training from Scratch
 The details are shown in [train.md](./doc/train.md) [TODO].
 
+## Announcement
+While, in our paper, the results of LPIPS reported in Table 1, are calculated by **1 – distance score**; 
+thereby, the larger is more similar between two images. The beginning intention of using **1 – distance score** is that it is more accurate to meet the definition of **Similarity** in LPIPS.
+
+However, most other papers use the original definition that LPIPS = distance score; 
+therefore, to eliminate the ambiguity and make it consistent with others, 
+we update the results in Table 1 with the original definition in the [latest paper](https://arxiv.org/pdf/1909.12224.pdf).
+
 ## Citation
 ![thunmbnail](assets/thumbnail.jpg)
 ```
