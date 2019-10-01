@@ -69,8 +69,8 @@ The results are saved in `./outputs/results/demos`
     ```
 
 
-### Running Scripts (examples) (Details)
-If you want to test other inputs (source image and reference images), here are some examples.
+### Running custom examples (Details)
+If you want to test other inputs (source image and reference images **from yourself**), here are some examples.
 Please replace the `--ip YOUR_IP` and `--port YOUR_PORT` for 
 [Visdom](https://github.com/facebookresearch/visdom) visualization. 
 
