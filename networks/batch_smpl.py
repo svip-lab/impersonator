@@ -35,11 +35,16 @@ def batch_skew(vec, batch_size=None, device="cpu"):
     if batch_size is None:
         batch_size = vec.shape[0]
 
-    col_inds = np.array([1, 2, 3, 5, 6, 7], dtype=np.int32)
+    col_inds = np.array([1, 2, 3, 5, 6, 7], dtype=np.int64)
 
-    indices = torch.from_numpy(np.reshape(
-        np.reshape(np.arange(0, batch_size) * 9, [-1, 1]) + col_inds,
-        newshape=(-1,))).to(device)
+    # indices = torch.from_numpy(np.reshape(
+    #     np.reshape(np.arange(0, batch_size) * 9, [-1, 1]) + col_inds,
+    #     newshape=(-1,))).to(device).long()
+
+    # For better compatibility， since if indices is torch.tensor, it must be long dtype.
+    # For fixed index, np.ndarray might be better.
+    indices = np.reshape(np.reshape(
+        np.arange(0, batch_size) * 9, [-1, 1]) + col_inds, newshape=(-1, )).astype(np.int64)
 
     updates = torch.stack(
         [
