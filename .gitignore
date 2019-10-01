@@ -12,3 +12,4 @@ outputs/results
 *dist
 thirdparty/neural_renderer/files.txt
 piao_scripts
+doc/bug_list.md

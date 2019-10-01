@@ -24,6 +24,7 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least 8GB GPU memory and other requirements.
+All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and other platforms have not been tested yet.
 ### Requirements
 ``` bash
 pip install -r requirements.txt
@@ -128,6 +129,14 @@ Please replace the `--ip YOUR_IP` and `--port YOUR_PORT` for
 The details of each running scripts are shown in [runDetails.md](doc/runDetails.md).
 ### Training from Scratch
 The details are shown in [train.md](./doc/train.md) [TODO].
+
+## Announcement
+In our paper, the results of LPIPS reported in Table 1, are calculated by **1 – distance score**; 
+thereby, the larger is more similar between two images. The beginning intention of using **1 – distance score** is that it is more accurate to meet the definition of **Similarity** in LPIPS.
+
+However, most other papers use the original definition that LPIPS = distance score; 
+therefore, to eliminate the ambiguity and make it consistent with others, 
+we update the results in Table 1 with the original definition in the [latest paper](https://arxiv.org/pdf/1909.12224.pdf).
 
 ## Citation
 ![thunmbnail](assets/thumbnail.jpg)
