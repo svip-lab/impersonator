@@ -1,0 +1,28 @@
+name: impersonator
+channels:
+  - omgarcia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - jupyter
+  - gcc-6
+  - certifi
+  - matplotlib
+  - numpy
+  - pip
+  - pip:
+    - imageio
+    - tqdm
+    - setuptools
+    - scipy
+    - torch==1.2.0
+    - torchvision==0.4.0
+    - h5py
+    - scikit_image
+    - visdom
+    - opencv_contrib_python
+    - ipdb
+    - Pillow
+    - progressbar2
+    - tensorboardX
