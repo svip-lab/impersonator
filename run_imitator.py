@@ -3,6 +3,7 @@ import torch.nn
 import torch.utils.data
 from tqdm import tqdm
 import os
+import sys
 import glob
 
 from data.dataset import PairSampleDataset
@@ -183,12 +184,15 @@ def make_dataset(opt):
 
     meta_cycle_ds = MetaCycleDataSet(opt=config)
     length = len(meta_cycle_ds)
-
+    if sys.platform in ("darwin", "linux", "linux2"):
+        num_workers = 4
+    elif sys.platform == "win32":
+        num_workers = 0
     data_loader = torch.utils.data.DataLoader(
         meta_cycle_ds,
         batch_size=min(length, opt.batch_size),
         shuffle=False,
-        num_workers=4,
+        num_workers=num_workers,
         drop_last=True)
 
     return data_loader

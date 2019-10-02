@@ -5,7 +5,7 @@ Specify joint types:
 'lsp': Returns H3.6M-LSP 14 joints
 Note: To get original smpl joints, use self.J_transformed
 """
-
+import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -55,7 +55,10 @@ def batch_skew(vec, batch_size=None, device="cpu"):
     ).view(-1).to(device)
 
     res = torch.zeros(batch_size * 9, dtype=vec.dtype).to(device)
-    res[indices] = updates
+    if sys.platform in ("darwin", "linux", "linux2"):
+        res[indices] = updates
+    elif sys.platform == "win32":
+        res[indices.long()] = updates
     res = res.view(batch_size, 3, 3)
 
     return res

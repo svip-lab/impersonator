@@ -69,7 +69,10 @@ def main():
     model = Model(args.filename_obj, args.filename_ref)
     model.cuda()
 
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()))
+    def lambda_req(p):
+        return p.requires_grad
+
+    optimizer = torch.optim.Adam(filter(lambda_req, model.parameters()))
     # optimizer.setup(model)
     loop = tqdm.tqdm(range(300))
     for i in loop:

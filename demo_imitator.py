@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import os
+import sys
 import glob
 
 from models.imitator import Imitator
@@ -45,7 +46,7 @@ def generate_actor_result(test_opt, src_img_path):
     src_img_name = os.path.split(src_img_path)[-1][:-4]
     test_opt.src_path = src_img_path
 
-    if test_opt.post_tune:
+    if test_opt.post_tune and sys.platform in ("darwin", "linux", "linux2"):
         adaptive_personalize(test_opt, imitator, visualizer=None)
     else:
         imitator.personalize(test_opt.src_path, visualizer=None)
