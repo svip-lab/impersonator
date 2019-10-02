@@ -51,7 +51,7 @@ unzip the `samples.zip` and move them to `assets` directory.
 
 
 ### Running Demo
-If you want to get the results of the demo shown in webpage, you can run the following scripts.
+If you want to get the results of the demo shown on the webpage, you can run the following scripts.
 The results are saved in `./outputs/results/demos`
 
 1. Demo of Motion Imitation
@@ -143,7 +143,7 @@ we update the results in Table 1 with the original definition in the [latest pap
 ```
 @InProceedings{lwb2019,
     title={Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance Transfer and Novel View Synthesis},
-    author={Wen Liu and Zhixin Piao, Min Jie, Wenhan Luo, Lin Ma and and Shenghua Gao},
+    author={Wen Liu and Zhixin Piao, Min Jie, Wenhan Luo, Lin Ma and Shenghua Gao},
     booktitle={The IEEE International Conference on Computer Vision (ICCV)},
     year={2019}
 }
