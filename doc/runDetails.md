@@ -84,6 +84,11 @@ the synthesized image likes a MASK MAN.
 image (out domain of the training set) from the Internet, the network seems to synthesize the style of images prone to the 
 training set. The details of `post_tune`are shown in [here](./postTune.md).
 
+* `--batch_size`: the mini-batch size in the procedure of `pose_tune`, default is 4. 
+If you want to be faster in `post_tune`, you can set a larger number,
+otherwise, if you get the errors like `RuntimeError: CUDA out of memory`, you can set `--batch_size 1`, the minimal 
+GPU memory is 3.8 GB.
+
 * `--load_path`: load which model for inference.
     ```bash
     # if use ImPer dataset trained model
