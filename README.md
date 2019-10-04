@@ -22,9 +22,13 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
     <img src='assets/visuals/novel/novel_3.gif' width="135"/>
 </p>
 
+## Update News
+- [x] 10/05/2019,  optimize the minimal requirements of GPU memory (at least `3.8GB` available).
+
 ## Getting Started
-Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least 8GB GPU memory and other requirements.
+Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least `3.8GB` GPU memory and other requirements.
 All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and other platforms have not been tested yet.
+
 ### Requirements
 ``` bash
 pip install -r requirements.txt
@@ -68,6 +72,9 @@ The results are saved in `./outputs/results/demos`
     ```bash
     python demo_view.py --gpu_ids 1
     ```
+    
+If you get the errors like `RuntimeError: CUDA out of memory`, please add the flag `--batch_size 1`, the minimal 
+GPU memory is 3.8 GB.
 
 
 ### Running custom examples (Details)
@@ -125,6 +132,9 @@ Please replace the `--ip YOUR_IP` and `--port YOUR_PORT` for
     --has_detector  --post_tune --front_warp --bg_replace \
     --save_res --ip http://10.10.10.100 --port 31102
     ```
+    
+If you get the errors like `RuntimeError: CUDA out of memory`, please add the flag `--batch_size 1`, the minimal 
+GPU memory is 3.8 GB.
 
 The details of each running scripts are shown in [runDetails.md](doc/runDetails.md).
 ### Training from Scratch

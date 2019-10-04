@@ -9,6 +9,8 @@ import utils.cv_utils as cv_utils
 import utils.util as util
 import utils.mesh as mesh
 
+import ipdb
+
 
 class Swapper(BaseModel):
 
@@ -143,9 +145,9 @@ class Swapper(BaseModel):
             incomp_img = img * bg_mask
             bg_inputs = torch.cat([incomp_img, bg_mask], dim=1)
             img_bg = self.bgnet(bg_inputs)
-            src_info['bg_inputs'] = bg_inputs
-            # src_info['bg'] = img_bg
-            src_info['bg'] = incomp_img + img_bg * body_mask
+            # src_info['bg_inputs'] = bg_inputs
+            src_info['bg'] = img_bg
+            # src_info['bg'] = incomp_img + img_bg * body_mask
 
         ft_mask = 1 - util.morph(src_info['cond'][:, -1:, :, :], ks=self._opt.ft_ks, mode='erode')
         src_inputs = torch.cat([img * ft_mask, src_info['cond']], dim=1)
@@ -270,6 +272,8 @@ class Swapper(BaseModel):
 
     def post_personalize(self, out_dir, visualizer, verbose=True):
         from networks.networks import FaceLoss
+        bs = 2 if self._opt.batch_size > 1 else 1
+
         init_bg = torch.cat([self.src_info['bg'], self.tsf_info['bg']], dim=0)
 
         @torch.no_grad()
@@ -337,12 +341,11 @@ class Swapper(BaseModel):
 
             return cycle_src_inputs, cycle_tsf_inputs
 
-        def inference(src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
+        def inference(bg, src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
             fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
                 self.generator.infer_front(src_inputs, tsf_inputs, T=T)
-
-            fake_src_imgs = fake_src_mask * init_bg + (1 - fake_src_mask) * fake_src_color
-            fake_tsf_imgs = fake_tsf_mask * init_bg + (1 - fake_tsf_mask) * fake_tsf_color
+            fake_src_imgs = fake_src_mask * bg + (1 - fake_src_mask) * fake_src_color
+            fake_tsf_imgs = fake_tsf_mask * bg + (1 - fake_tsf_mask) * fake_tsf_color
 
             if self._opt.front_warp:
                 fake_tsf_imgs = self.warp(fake_tsf_imgs, tsf_inputs[:, 0:3], tsf_fim, fake_tsf_mask)
@@ -353,8 +356,8 @@ class Swapper(BaseModel):
             cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
                 self.generator.infer_front(cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
 
-            cycle_src_imgs = cycle_src_mask * init_bg + (1 - cycle_src_mask) * cycle_src_color
-            cycle_tsf_imgs = cycle_tsf_mask * init_bg + (1 - cycle_tsf_mask) * cycle_tsf_color
+            cycle_src_imgs = cycle_src_mask * bg + (1 - cycle_src_mask) * cycle_src_color
+            cycle_tsf_imgs = cycle_tsf_mask * bg + (1 - cycle_tsf_mask) * cycle_tsf_color
 
             if self._opt.front_warp:
                 cycle_tsf_imgs = self.warp(cycle_tsf_imgs, src_inputs[:, 0:3], src_fim, fake_src_mask)
@@ -390,6 +393,8 @@ class Swapper(BaseModel):
         final_lr = 0.00001
         fix_iters = 25
         total_iters = 50
+        # fix_iters = int(50 / bs)
+        # total_iters = int(100 / bs)
         optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
         face_cri, idt_cri, msk_cri = create_criterion()
 
@@ -401,43 +406,52 @@ class Swapper(BaseModel):
 
         logger = tqdm(range(total_iters))
         for step in logger:
+            if bs == 1:
+                i = step % 2
+                _bg = init_bg[i][None]
+                _init_preds = init_preds[i][None]
+                _src_imgs = src_imgs[i][None]
+                _src_inputs = src_inputs[i][None]
+                _tsf_inputs = tsf_inputs[i][None]
+                _T = T[i][None]
+                _T_cycle = T_cycle[i][None]
+                _src_fim = src_fim[i][None]
+                _tsf_fim = tsf_fim[i][None]
 
-            fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, \
-            fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(src_inputs, tsf_inputs,
-                                                                       T, T_cycle, src_fim, tsf_fim)
+                _pseudo_masks = pseudo_masks[i:4:2]
+            else:
+                _bg = init_bg
+                _src_imgs = src_imgs
+                _init_preds = init_preds
+                _pseudo_masks = pseudo_masks
+                _src_inputs, _tsf_inputs, _T, _T_cycle, _src_fim, _tsf_fim = \
+                    src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim
+            fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, \
+            cycle_tsf_inputs = inference(_bg, _src_inputs, _tsf_inputs, _T, _T_cycle, _src_fim, _tsf_fim)
 
             # cycle reconstruction loss
-            cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)
+            cycle_loss = idt_cri(_src_imgs, fake_src_imgs) + idt_cri(_src_imgs, cycle_tsf_imgs)
 
             # structure loss
-            bg_mask = src_inputs[:, -1:]
+            bg_mask = _src_inputs[:, -1:]
             body_mask = 1.0 - bg_mask
-            str_src_imgs = src_imgs * body_mask
+            str_src_imgs = _src_imgs * body_mask
             cycle_warp_imgs = cycle_tsf_inputs[:, 0:3]
-            # back_head_mask = 1 - self.render.encode_front_fim(tsf_fim, transpose=True, front_fn=False)
-            # struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
-            #               2 * idt_cri(str_src_imgs * back_head_mask, cycle_warp_imgs * back_head_mask)
 
-            struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
+            struct_loss = idt_cri(_init_preds, fake_tsf_imgs) + \
                           2 * idt_cri(str_src_imgs, cycle_warp_imgs)
 
-            # fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
-            #            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
-
-            fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
-                       face_cri(tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+            fid_loss = face_cri(_src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
+                       face_cri(_tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
 
             # mask loss
             # mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
-            mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), pseudo_masks)
+            mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), _pseudo_masks)
 
             loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            # print_losses(step=step, total=loss, cyc=cycle_loss,
-            #              str=struct_loss, fid=fid_loss, msk=mask_loss)
 
             if verbose:
                 logger.set_description(
@@ -461,3 +475,197 @@ class Swapper(BaseModel):
 
         self.generator.eval()
 
+    # def post_personalize_previous(self, out_dir, visualizer, verbose=True):
+    #     from networks.networks import FaceLoss
+    #     bs = 2 if self._opt.batch_size > 1 else 1
+    #
+    #     init_bg = torch.cat([self.src_info['bg'], self.tsf_info['bg']], dim=0)
+    #
+    #     @torch.no_grad()
+    #     def initialize(src_info, tsf_info):
+    #         src_encoder_outs, src_resnet_outs = src_info['feats']
+    #         src_f2p = src_info['p2verts']
+    #
+    #         tsf_fim = tsf_info['fim']
+    #         tsf_wim = tsf_info['wim']
+    #         tsf_cond = tsf_info['cond']
+    #
+    #         T = self.render.cal_bc_transform(src_f2p, tsf_fim, tsf_wim)
+    #         tsf_img = F.grid_sample(src_info['img'], T)
+    #         tsf_inputs = torch.cat([tsf_img, tsf_cond], dim=1)
+    #
+    #         tsf_color, tsf_mask = self.generator.inference(
+    #             src_encoder_outs, src_resnet_outs, tsf_inputs, T)
+    #
+    #         preds = src_info['bg'] * tsf_mask + tsf_color * (1 - tsf_mask)
+    #
+    #         if self._opt.front_warp:
+    #             preds = self.warp(preds, tsf_img, tsf_fim, tsf_mask)
+    #
+    #         return preds, T, tsf_inputs
+    #
+    #     @torch.no_grad()
+    #     def set_inputs(src_info, tsf_info):
+    #         s2t_init_preds, s2t_T, s2t_tsf_inputs = initialize(src_info, tsf_info)
+    #         t2s_init_preds, t2s_T, t2s_tsf_inputs = initialize(tsf_info, src_info)
+    #
+    #         s2t_j2d = torch.cat([src_info['j2d'], tsf_info['j2d']], dim=0)
+    #         t2s_j2d = torch.cat([tsf_info['j2d'], src_info['j2d']], dim=0)
+    #         j2ds = torch.stack([s2t_j2d, t2s_j2d], dim=0)
+    #
+    #         init_preds = torch.cat([s2t_init_preds, t2s_init_preds], dim=0)
+    #         images = torch.cat([src_info['img'], tsf_info['img']], dim=0)
+    #         T = torch.cat([s2t_T, t2s_T], dim=0)
+    #         T_cycle = torch.cat([t2s_T, s2t_T], dim=0)
+    #         tsf_inputs = torch.cat([s2t_tsf_inputs, t2s_tsf_inputs], dim=0)
+    #         src_fim = torch.cat([src_info['fim'], tsf_info['fim']], dim=0)
+    #         tsf_fim = torch.cat([tsf_info['fim'], src_info['fim']], dim=0)
+    #
+    #         s2t_inputs = src_info['src_inputs']
+    #         t2s_inputs = tsf_info['src_inputs']
+    #
+    #         src_inputs = torch.cat([s2t_inputs, t2s_inputs], dim=0)
+    #
+    #         src_mask = util.morph(src_inputs[:, -1:, ], ks=self._opt.ft_ks, mode='erode')
+    #         tsf_mask = util.morph(tsf_inputs[:, -1:, ], ks=self._opt.ft_ks, mode='erode')
+    #
+    #         pseudo_masks = torch.cat([src_mask, tsf_mask], dim=0)
+    #
+    #         return src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, images, init_preds, pseudo_masks
+    #
+    #     def set_cycle_inputs(fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle):
+    #         # set cycle bg inputs
+    #         tsf_bg_mask = tsf_inputs[:, -1:, ...]
+    #
+    #         # set cycle src inputs
+    #         cycle_src_inputs = torch.cat([fake_tsf_imgs * tsf_bg_mask, tsf_inputs[:, 3:]], dim=1)
+    #
+    #         # set cycle tsf inputs
+    #         cycle_tsf_img = F.grid_sample(fake_tsf_imgs, T_cycle)
+    #         cycle_tsf_inputs = torch.cat([cycle_tsf_img, src_inputs[:, 3:]], dim=1)
+    #
+    #         return cycle_src_inputs, cycle_tsf_inputs
+    #
+    #     def inference(src_inputs, tsf_inputs, T, T_cycle, src_fim, tsf_fim):
+    #         fake_src_color, fake_src_mask, fake_tsf_color, fake_tsf_mask = \
+    #             self.generator.infer_front(src_inputs, tsf_inputs, T=T)
+    #
+    #         fake_src_imgs = fake_src_mask * init_bg + (1 - fake_src_mask) * fake_src_color
+    #         fake_tsf_imgs = fake_tsf_mask * init_bg + (1 - fake_tsf_mask) * fake_tsf_color
+    #
+    #         if self._opt.front_warp:
+    #             fake_tsf_imgs = self.warp(fake_tsf_imgs, tsf_inputs[:, 0:3], tsf_fim, fake_tsf_mask)
+    #
+    #         cycle_src_inputs, cycle_tsf_inputs = set_cycle_inputs(
+    #             fake_tsf_imgs, src_inputs, tsf_inputs, T_cycle)
+    #
+    #         cycle_src_color, cycle_src_mask, cycle_tsf_color, cycle_tsf_mask = \
+    #             self.generator.infer_front(cycle_src_inputs, cycle_tsf_inputs, T=T_cycle)
+    #
+    #         cycle_src_imgs = cycle_src_mask * init_bg + (1 - cycle_src_mask) * cycle_src_color
+    #         cycle_tsf_imgs = cycle_tsf_mask * init_bg + (1 - cycle_tsf_mask) * cycle_tsf_color
+    #
+    #         if self._opt.front_warp:
+    #             cycle_tsf_imgs = self.warp(cycle_tsf_imgs, src_inputs[:, 0:3], src_fim, fake_src_mask)
+    #
+    #         return fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, fake_src_mask, fake_tsf_mask, cycle_tsf_inputs
+    #
+    #     def create_criterion():
+    #         face_criterion = FaceLoss(pretrained_path=self._opt.face_model).cuda()
+    #         idt_criterion = torch.nn.L1Loss()
+    #         mask_criterion = torch.nn.BCELoss()
+    #
+    #         return face_criterion, idt_criterion, mask_criterion
+    #
+    #     def print_losses(*args, **kwargs):
+    #
+    #         print('step = {}'.format(kwargs['step']))
+    #         for key, value in kwargs.items():
+    #             if key == 'step':
+    #                 continue
+    #             print('\t{}, {:.6f}'.format(key, value.item()))
+    #
+    #     def update_learning_rate(optimizer, current_lr, init_lr, final_lr, nepochs_decay):
+    #         # updated learning rate G
+    #         lr_decay = (init_lr - final_lr) / nepochs_decay
+    #         current_lr -= lr_decay
+    #         for param_group in optimizer.param_groups:
+    #             param_group['lr'] = current_lr
+    #         # print('update G learning rate: %f -> %f' % (current_lr + lr_decay, current_lr))
+    #         return current_lr
+    #
+    #     init_lr = 0.0002
+    #     cur_lr = init_lr
+    #     final_lr = 0.00001
+    #     fix_iters = 25
+    #     total_iters = 50
+    #     optimizer = torch.optim.Adam(self.generator.parameters(), lr=init_lr, betas=(0.5, 0.999))
+    #     face_cri, idt_cri, msk_cri = create_criterion()
+    #
+    #     # set up inputs
+    #     src_fim, tsf_fim, j2ds, T, T_cycle, src_inputs, tsf_inputs, \
+    #     src_imgs, init_preds, pseudo_masks = set_inputs(
+    #         src_info=self.src_info, tsf_info=self.tsf_info
+    #     )
+    #
+    #     logger = tqdm(range(total_iters))
+    #     for step in logger:
+    #
+    #         fake_src_imgs, fake_tsf_imgs, cycle_src_imgs, cycle_tsf_imgs, \
+    #         fake_src_mask, fake_tsf_mask, cycle_tsf_inputs = inference(src_inputs, tsf_inputs,
+    #                                                                    T, T_cycle, src_fim, tsf_fim)
+    #
+    #         # cycle reconstruction loss
+    #         cycle_loss = idt_cri(src_imgs, fake_src_imgs) + idt_cri(src_imgs, cycle_tsf_imgs)
+    #
+    #         # structure loss
+    #         bg_mask = src_inputs[:, -1:]
+    #         body_mask = 1.0 - bg_mask
+    #         str_src_imgs = src_imgs * body_mask
+    #         cycle_warp_imgs = cycle_tsf_inputs[:, 0:3]
+    #         # back_head_mask = 1 - self.render.encode_front_fim(tsf_fim, transpose=True, front_fn=False)
+    #         # struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
+    #         #               2 * idt_cri(str_src_imgs * back_head_mask, cycle_warp_imgs * back_head_mask)
+    #
+    #         struct_loss = idt_cri(init_preds, fake_tsf_imgs) + \
+    #                       2 * idt_cri(str_src_imgs, cycle_warp_imgs)
+    #
+    #         # fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
+    #         #            face_cri(init_preds, fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+    #
+    #         fid_loss = face_cri(src_imgs, cycle_tsf_imgs, kps1=j2ds[:, 0], kps2=j2ds[:, 0]) + \
+    #                    face_cri(tsf_inputs[:, 0:3], fake_tsf_imgs, kps1=j2ds[:, 1], kps2=j2ds[:, 1])
+    #
+    #         # mask loss
+    #         # mask_loss = msk_cri(fake_tsf_mask, tsf_inputs[:, -1:]) + msk_cri(fake_src_mask, src_inputs[:, -1:])
+    #         mask_loss = msk_cri(torch.cat([fake_src_mask, fake_tsf_mask], dim=0), pseudo_masks)
+    #
+    #         loss = 10 * cycle_loss + 10 * struct_loss + fid_loss + 5 * mask_loss
+    #         optimizer.zero_grad()
+    #         loss.backward()
+    #         optimizer.step()
+    #
+    #         # print_losses(step=step, total=loss, cyc=cycle_loss,
+    #         #              str=struct_loss, fid=fid_loss, msk=mask_loss)
+    #
+    #         if verbose:
+    #             logger.set_description(
+    #                 (
+    #                     f'step: {step}; '
+    #                     f'total: {loss.item():.6f}; cyc: {cycle_loss.item():.6f}; '
+    #                     f'str: {struct_loss.item():.6f}; fid: {fid_loss.item():.6f}; '
+    #                     f'msk: {mask_loss.item():.6f}'
+    #                 )
+    #             )
+    #
+    #         if step % 10 == 0:
+    #             self.visualize(visualizer, input_imgs=src_imgs, tsf_imgs=fake_tsf_imgs,
+    #                            cyc_imgs=cycle_tsf_imgs, fake_tsf_mask=fake_tsf_mask,
+    #                            init_preds=init_preds,
+    #                            str_src_imgs=str_src_imgs,
+    #                            cycle_warp_imgs=cycle_warp_imgs)
+    #
+    #         if step > fix_iters:
+    #             cur_lr = update_learning_rate(optimizer, cur_lr, init_lr, final_lr, fix_iters)
+    #
+    #     self.generator.eval()
