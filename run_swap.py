@@ -55,6 +55,7 @@ if __name__ == "__main__":
     if opt.post_tune:
         print('\n\t\t\tPersonalization: meta cycle finetune...')
         swapper.post_personalize(opt.output_dir, visualizer=None, verbose=False)
+        # swapper.post_personalize(opt.output_dir, visualizer=visualizer, verbose=True, bidirection=opt.bidirection)
 
     print('\n\t\t\tPersonalization: completed...')
 

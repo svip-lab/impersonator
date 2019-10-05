@@ -14,7 +14,9 @@ Fix some bugs and update the `post_personalize` function of each task, replacing
 ## ImPer-1.2
 
 ### ImPer-1.2.1
-Merge running scripts and demo scripts.
+- [x] 09/27/2019, merge running scripts and demo scripts.
+
+- [x] 10/05/2019, optimize the minimal requirements of GPU memory (at least `3.8GB` available).
 
 ### Imper-1.2.2
 * add the training document [train.md](../doc/train.md).
