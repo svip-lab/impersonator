@@ -25,6 +25,8 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 ## Update News
 - [x] 10/05/2019,  optimize the minimal requirements of GPU memory (at least `3.8GB` available).
 
+- [x] 10/24/2019, add the training document [train.md](../doc/train.md).
+
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least `3.8GB` GPU memory and other requirements.
 All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and other platforms have not been tested yet.
@@ -146,7 +148,8 @@ GPU memory is 3.8 GB.
 
 The details of each running scripts are shown in [runDetails.md](doc/runDetails.md).
 ### Training from Scratch
-The details are shown in [train.md](./doc/train.md) [TODO].
+
+* The details of training iPER dataset from scratch are shown in [train.md](./doc/train.md).
 
 ## Announcement
 In our paper, the results of LPIPS reported in Table 1, are calculated by **1 – distance score**; 

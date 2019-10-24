@@ -86,7 +86,7 @@ class BaseModel(object):
         from utils.mesh import get_map_fn_dim
         if self._opt.map_name:
             nc = get_map_fn_dim(self._opt.map_name)
-            _G_cond_nc, _D_cond_nc = nc, nc + nc
+            _G_cond_nc, _D_cond_nc = nc, nc
         else:
             _G_cond_nc = self._opt.cond_nc
             _D_cond_nc = self._opt.cond_nc
@@ -163,22 +163,20 @@ class BaseModel(object):
         def load(model, orig_state_dict):
             state_dict = OrderedDict()
             for k, v in orig_state_dict.items():
-                if 'module' in k:
-                    name = k[7:]  # remove `module.`
-                else:
-                    name = k
+                # remove 'module'
+                name = k[7:] if 'module' in k else k
                 state_dict[name] = v
 
             # load params
-            # model.load_state_dict(state_dict)
-            model.load_state_dict(state_dict, strict=False)
+            model.load_state_dict(state_dict)
 
         save_data = torch.load(load_path)
         if need_module:
             network.load_state_dict(save_data)
         else:
             load(network, save_data)
-        print('loaded net: %s' % load_path)
+
+        print('Loading net: %s' % load_path)
 
     def update_learning_rate(self):
         pass

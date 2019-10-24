@@ -33,6 +33,9 @@ class BaseOptions(object):
 
         self._parser.add_argument('--load_epoch', type=int, default=-1,
                                   help='which epoch to load? set to -1 to use latest cached model')
+        self._parser.add_argument('--load_path', type=str,
+                                  default='./outputs/checkpoints/lwb_imper_fashion_place/net_epoch_30_id_G.pth',
+                                  help='pretrained model path')
         self._parser.add_argument('--batch_size', type=int, default=4, help='input batch size')
         self._parser.add_argument('--time_step', type=int, default=10, help='time step size')
         self._parser.add_argument('--tex_size', type=int, default=3, help='input tex size')
@@ -58,10 +61,21 @@ class BaseOptions(object):
                                   default=False, help='debug or not')
         self._initialized = True
 
+    def set_zero_thread_for_Win(self):
+        import platform
+        if platform.system() == 'Windows':
+            if 'n_threads_test' in self._opt.__class__:
+                self._opt.__setattr__('n_threads_test', 0)
+
+            if 'n_threads_train' in self._opt.__class__:
+                self._opt.__setattr__('n_threads_train', 0)
+
     def parse(self):
         if not self._initialized:
             self.initialize()
         self._opt = self._parser.parse_args()
+
+        self.set_zero_thread_for_Win()
 
         # set is train or set
         self._opt.is_train = self.is_train

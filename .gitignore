@@ -2,7 +2,6 @@
 *.pyc
 *.zip
 *.pth
-tools/*
 pretrains
 assets/samples
 outputs/results

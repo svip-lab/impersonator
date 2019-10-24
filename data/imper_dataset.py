@@ -66,13 +66,12 @@ class ImPerBaseDataset(DatasetBase):
 
             total = len(lines)
             for i, line in enumerate(lines):
-                images_path = glob.glob(os.path.join(self._vids_dir, line, '*.jpg'))
+                images_path = glob.glob(os.path.join(self._vids_dir, line, '*'))
                 images_path.sort()
                 smpl_data = load_pickle_file(os.path.join(self._smpls_dir, line, 'pose_shape.pkl'))
-                kps_data = load_pickle_file(os.path.join(self._smpls_dir, line, 'kps.pkl'))
-
                 cams = smpl_data['cams']
-                kps = (kps_data['kps'] + 1) / 2.0 * 1024
+                # kps_data = load_pickle_file(os.path.join(self._smpls_dir, line, 'kps.pkl'))
+                # kps = (kps_data['kps'] + 1) / 2.0 * 1024
 
                 assert len(images_path) == len(cams), '{} != {}'.format(len(images_path), len(cams))
 
@@ -81,7 +80,6 @@ class ImPerBaseDataset(DatasetBase):
                     'cams': cams,
                     'thetas': smpl_data['pose'],
                     'betas': smpl_data['shape'],
-                    'j2ds': kps,
                     'length': len(images_path)
                 }
                 vids_info.append(info)

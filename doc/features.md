@@ -19,6 +19,4 @@ Fix some bugs and update the `post_personalize` function of each task, replacing
 - [x] 10/05/2019, optimize the minimal requirements of GPU memory (at least `3.8GB` available).
 
 ### Imper-1.2.2
-* add the training document [train.md](../doc/train.md).
-* **TODO**: convert all `*.pkl` of smpl files in iPER to `.h5`. This will reduce the loading time.
-* **TODO**: add h5 file Dataset. 
+- [x] 10/24/2019, add the training document [train.md](../doc/train.md).

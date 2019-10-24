@@ -130,8 +130,7 @@ class ConcatBaseline(BaseModel):
         # source process
         src_info = self._criterion_hmr.hmr.get_details(self._input_src_smpl)
         src_rd, src_info['tex'] = self._render.forward(src_info['cam'], src_info['verts'],
-                                                       self._input_src_img, is_uv_sampler=False,
-                                                       reverse_yz=True, get_fim=False)
+                                                       self._input_src_img, get_fim=False)
 
         self._input_src_cond, src_info['fim'] = self._render.encode_fim(src_info['cam'], src_info['verts'], transpose=True)
         src_bg_mask = self.morph(self._input_src_cond[:, -1:, :, :], ks=15, mode='erode')
@@ -226,10 +225,10 @@ class ConcatBaseline(BaseModel):
         self._loss_g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
 
         # l_cyc(G(Ic1,c2)*M, Ic2)
-        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_lp
+        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_rec
 
         if self._opt.use_vgg:
-            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_vgg
+            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_tsf
 
         if self._opt.use_face:
             self._loss_g_face = self._criterion_face(fake_tsf_imgs, self._input_desired_img,
@@ -662,10 +661,10 @@ class TextureWarpingBaseline(BaseModel):
         self._loss_g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
 
         # l_cyc(G(Ic1,c2)*M, Ic2)
-        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_lp
+        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_rec
 
         if self._opt.use_vgg:
-            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_vgg
+            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_tsf
 
         if self._opt.use_face:
             self._loss_g_face = self._criterion_face(fake_tsf_imgs, self._input_desired_img,
@@ -1161,10 +1160,10 @@ class FeatureWarpingBaseline(BaseModel):
         self._loss_g_adv = self._compute_loss_D(d_fake_outs, 0) * self._opt.lambda_D_prob
 
         # l_cyc(G(Ic1,c2)*M, Ic2)
-        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_lp
+        self._loss_g_l1 = self._criterion_l1(fake_imgs, self._input_real_imgs) * self._opt.lambda_rec
 
         if self._opt.use_vgg:
-            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_vgg
+            self._loss_g_vgg = self._criterion_vgg(fake_imgs, self._input_real_imgs) * self._opt.lambda_tsf
 
         if self._opt.use_face:
             self._loss_g_face = self._criterion_face(fake_tsf_imgs, self._input_desired_img,

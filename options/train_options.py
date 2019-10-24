@@ -20,6 +20,7 @@ class TrainOptions(BaseOptions):
         self._parser.add_argument('--display_freq_s', type=int, default=300, help='frequency [s] of showing training results on screen')
         self._parser.add_argument('--save_latest_freq_s', type=int, default=3600, help='frequency of saving the latest results')
 
+        self._parser.add_argument('--bg_both', action="store_true", help='inpainting both source and target background or not.')
         self._parser.add_argument('--use_vgg', action='store_true', help='whether to use VGG loss or L1 loss, if true use VGG, other use L1, default is L1')
         self._parser.add_argument('--use_style', action='store_true', help='whether to use style loss or not')
         self._parser.add_argument('--use_face', action='store_true', help='whether to use face loss or not')
@@ -36,8 +37,8 @@ class TrainOptions(BaseOptions):
         self._parser.add_argument('--D_adam_b1', type=float, default=0.5, help='beta1 for D adam')
         self._parser.add_argument('--D_adam_b2', type=float, default=0.999, help='beta2 for D adam')
         self._parser.add_argument('--lambda_D_prob', type=float, default=1, help='lambda for real/fake discriminator loss')
-        self._parser.add_argument('--lambda_lp', type=float, default=10, help='lambda lp loss')
-        self._parser.add_argument('--lambda_vgg', type=float, default=10, help='lambda vgg loss')
+        self._parser.add_argument('--lambda_rec', type=float, default=10, help='lambda SID loss')
+        self._parser.add_argument('--lambda_tsf', type=float, default=10, help='lambda TSF loss')
         self._parser.add_argument('--lambda_style', type=float, default=5, help='lambda style loss')
         self._parser.add_argument('--lambda_face', type=float, default=1, help='lambda face loss')
         self._parser.add_argument('--lambda_mask', type=float, default=0.1, help='lambda mask loss')

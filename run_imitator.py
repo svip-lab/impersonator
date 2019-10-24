@@ -164,6 +164,8 @@ class MetaCycleDataSet(PairSampleDataset):
 
 
 def make_dataset(opt):
+    import platform
+
     class Config(object):
         pass
 
@@ -188,7 +190,7 @@ def make_dataset(opt):
         meta_cycle_ds,
         batch_size=min(length, opt.batch_size),
         shuffle=False,
-        num_workers=4,
+        num_workers=0 if platform.system() == 'Windows' else 4,
         drop_last=True)
 
     return data_loader
