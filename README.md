@@ -25,7 +25,7 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 ## Update News
 - [x] 10/05/2019, optimize the minimal requirements of GPU memory (at least `3.8GB` available).
 
-- [x] 10/24/2019, Imper-1.2.2, add the training document [train.md](../doc/train.md).
+- [x] 10/24/2019, Imper-1.2.2, add the training document [train.md](./doc/train.md).
 
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least `3.8GB` GPU memory and other requirements.
