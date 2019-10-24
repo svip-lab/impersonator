@@ -105,8 +105,8 @@ other baselines.
 
 4. Run the [training script](../scripts/train_iPER.sh).
     ```bash
-    chmod a+x scripts/train_iPER.sh
-    ./scripts/train_iPER.sh
+    chmod a+x scripts/train_iPER_Place2.sh
+    ./scripts/train_iPER_Place2.sh
     ```
 
 5. Tensorboard visualization
