@@ -103,7 +103,7 @@ other baselines.
     
     ```
 
-4. Run the [training script](../scripts/train_iPER.sh).
+4. Run the [training script](../scripts/train_iPER_Place2.sh).
     ```bash
     chmod a+x scripts/train_iPER_Place2.sh
     ./scripts/train_iPER_Place2.sh
