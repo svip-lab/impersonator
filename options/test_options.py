@@ -11,10 +11,6 @@ class TestOptions(BaseOptions):
         self._parser.add_argument('--pri_path', type=str, default='./assets/samples/A_priors/imgs',
                                   help='prior image path')
 
-        self._parser.add_argument('--load_path', type=str,
-                                  default='./outputs/checkpoints/lwb_imper_fashion_place/net_epoch_30_id_G.pth',
-                                  help='pretrained model path')
-
         self._parser.add_argument('--bg_model', type=str,
                                   default='./outputs/checkpoints/deepfillv2/net_epoch_50_id_G.pth',
                                   help='if it is `ORIGINAL`, it will use the '
