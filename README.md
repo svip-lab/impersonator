@@ -5,7 +5,7 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 
 **Please clone the newest codes.**
 
-[[paper]](https://arxiv.org/pdf/1909.12224.pdf) [[website]](https://svip-lab.github.io/project/impersonator)
+[[paper]](https://arxiv.org/pdf/1909.12224.pdf) [[website]](https://svip-lab.github.io/project/impersonator) [[Supplemental Material]](https://svip-lab.github.io/project_img/impersonator/4701-supp.pdf) [[Dataset]](https://svip-lab.github.io/dataset/iPER_dataset.html)
 
 <p float="center">
 	<img src='assets/visuals/motion/Sweaters-id_0000088807_4_full.jpg' width="135"/>
