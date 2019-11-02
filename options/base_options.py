@@ -64,10 +64,10 @@ class BaseOptions(object):
     def set_zero_thread_for_Win(self):
         import platform
         if platform.system() == 'Windows':
-            if 'n_threads_test' in self._opt.__class__:
+            if 'n_threads_test' in self._opt.__dict__:
                 self._opt.__setattr__('n_threads_test', 0)
 
-            if 'n_threads_train' in self._opt.__class__:
+            if 'n_threads_train' in self._opt.__dict__:
                 self._opt.__setattr__('n_threads_train', 0)
 
     def parse(self):
