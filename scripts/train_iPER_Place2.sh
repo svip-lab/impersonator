@@ -56,4 +56,4 @@ python train.py --gpu_ids ${gpu_ids}        \
     --lambda_mask      ${lambda_mask}       \
     --lambda_mask_smooth  ${lambda_mask_smooth} \
     --nepochs_no_decay ${nepochs_no_decay}  --nepochs_decay ${nepochs_decay}  \
-    --mask_bce     --use_vgg     --use_style     --use_face
+    --mask_bce     --use_vgg        --use_face
