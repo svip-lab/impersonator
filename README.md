@@ -34,6 +34,7 @@ All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and o
 ### Requirements
 ``` bash
 pip install -r requirements.txt
+apt-get install ffmpeg
 ```
 
 ### Installation
