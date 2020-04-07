@@ -154,6 +154,11 @@ The details of each running scripts are shown in [runDetails.md](doc/runDetails.
 
 * The details of training iPER dataset from scratch are shown in [train.md](./doc/train.md).
 
+### Evaluation
+Run ```./scripts/motion_imitation/evaluate.sh```.
+The details of the evaluation on iPER dataset in [his_evaluators](./thirdparty/his_evaluators/README.md).
+
+
 ## Announcement
 In our paper, the results of LPIPS reported in Table 1, are calculated by **1 – distance score**; 
 thereby, the larger is more similar between two images. The beginning intention of using **1 – distance score** is that it is more accurate to meet the definition of **Similarity** in LPIPS.

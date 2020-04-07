@@ -154,7 +154,8 @@ For cross-imitation (unpair_types), it provides,
 * `fid`: Frechet Inception Distance (InceptionV3 backbone);
 * `PCB-CS-reid`: the cosine similarity of a pre-trained person re-identification model, 
 PCB [PCB-Net backbone](http://openaccess.thecvf.com/content_ECCV_2018/papers/Yifan_Sun_Beyond_Part_Models_ECCV_2018_paper.pdf).
-* `PCB-freid`: the Frechet Distance of PCB-Net.
+* `PCB-freid`: the Frechet Distance of PCB-Net, and it is very slow, O(n^3). n is the dimension of the feature of PCB-Net,
+and n = 12,288‬.
 * `OS-CS-reid`: the cosine similarity of a pre-trained person re-identification model, 
 [OS-Net](https://github.com/KaiyangZhou/deep-person-reid/blob/master/torchreid/models/osnet.py).
 * `OS-freid`: the Frechet Distance of OS-Net.

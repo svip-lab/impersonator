@@ -276,3 +276,7 @@ class IPERProtocol(Protocol):
             length = len(os.listdir(src_vid))
             total += length
         return total
+
+
+class ICCVIPERProtocol(IPERProtocol):
+    raise NotImplementedError

@@ -163,7 +163,7 @@ class MotionImitationEvaluator(Evaluator, ABC):
         self.paired_metrics_runner = None
         self.unpaired_metrics_runner = None
 
-    def build_metrics(self, pair_types=("ssim", "psnr", "lps"), unpair_types=("is", "fid", "freid", "reid_score")):
+    def build_metrics(self, pair_types=("ssim", "psnr", "lps"), unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid")):
         paired_metrics_runner = PairedMetricRunner(metric_types=pair_types)
         unpaired_metrics_runner = UnpairedMetricRunner(metric_types=unpair_types)
 
