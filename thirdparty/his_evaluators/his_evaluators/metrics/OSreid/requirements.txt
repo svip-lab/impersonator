@@ -1,0 +1,4 @@
+torch==1.2
+numpy==1.16.4
+Pillow
+pandas

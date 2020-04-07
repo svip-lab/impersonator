@@ -1,14 +1,15 @@
 .idea
 *.pyc
 *.zip
-*.pth
 pretrains
 assets/samples
 outputs/results
+outputs/checkpoints
 *debug.sh
 *debug.py
 *build
 *dist
+*.egg-info
 thirdparty/neural_renderer/files.txt
 piao_scripts
 doc/bug_list.md

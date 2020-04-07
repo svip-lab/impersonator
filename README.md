@@ -27,6 +27,8 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 
 - [x] 10/24/2019, Imper-1.2.2, add the training document [train.md](./doc/train.md).
 
+- [x] 07/04/2020, Add the [evaluation metrics](./thirdparty/his_evaluators/README.md) on iPER dataset.
+
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least `3.8GB` GPU memory and other requirements.
 All codes are tested on Linux Distributions (Ubutun 16.04 is recommended), and other platforms have not been tested yet.
