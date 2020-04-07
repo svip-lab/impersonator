@@ -15,11 +15,11 @@ pip install -e .
 
 #### 1. Example
 To use the evaluator, we must firstly implement all the interfaces 
-in of Class [MotionImitationModel](./his_evaluators/evaluators/motion_imitation.py), and 
+of Class [MotionImitationModel](./his_evaluators/evaluators/motion_imitation.py), and 
 ```python
 from his_evaluators import MotionImitationModel, IPERMotionImitationEvaluator
 
-class MyMotionImitationModel(MotionImitationModel):
+class LWGEvaluatorModel(MotionImitationModel):
 
     def __init__(self, opt, output_dir):
         super().__init__(output_dir)
