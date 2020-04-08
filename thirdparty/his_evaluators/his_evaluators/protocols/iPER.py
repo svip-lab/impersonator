@@ -16,8 +16,11 @@ class IPERProtocol(Protocol):
         self.train_ids_file = "train.txt"
         self.test_ids_file = "val.txt"
         self.eval_path = "iPER_protocol.json"
-        self.images_folder = "images_HD"
         self.smpls_folder = "smpls"
+        # self.images_folder = "iPER_1024_video_release"
+        # self.images_folder = "iPER_256_video_release"
+        # self.images_folder = "images_HD"
+        self.images_folder = "images"
 
         """
         "001/9/1": {
