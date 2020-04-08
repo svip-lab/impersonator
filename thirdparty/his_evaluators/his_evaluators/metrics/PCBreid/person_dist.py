@@ -16,7 +16,7 @@ class Config(object):
     pass
 
 
-def create_model(name='', model_dir='./model'):
+def create_model(name='PCB', model_dir='./model'):
     cfg = Config()
 
     config_path = os.path.join(model_dir, name, 'opts.yaml')
