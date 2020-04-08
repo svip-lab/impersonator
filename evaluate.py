@@ -99,13 +99,13 @@ class LWGEvaluatorModel(MotionImitationModel):
                 ...
         """
 
-        # # 1. load the pretrain model
-        # self.model._load_params(self.model.generator, self.opt.load_path)
-        #
-        # # 2. post personalization
-        # if self.opt.post_tune:
-        #     self.opt.src_path = src_infos["images"][0]
-        #     adaptive_personalize(self.opt, self.model, self.visualizer)
+        # 1. load the pretrain model
+        self.model._load_params(self.model.generator, self.opt.load_path)
+
+        # 2. post personalization
+        if self.opt.post_tune:
+            self.opt.src_path = src_infos["images"][0]
+            adaptive_personalize(self.opt, self.model, self.visualizer)
 
         processed_src_infos = src_infos
         return processed_src_infos
@@ -123,8 +123,8 @@ class LWGEvaluatorModel(MotionImitationModel):
 if __name__ == "__main__":
     opt = TestOptions().parse()
 
-    model = LWGEvaluatorModel(opt, output_dir="/p300/tpami/baselines/WarpingStrategy/LWB-add/evaluations/iPER")
-    iPER_MI_evaluator = IPERMotionImitationEvaluator(data_dir="/p300/tpami/iPER")
+    model = LWGEvaluatorModel(opt, output_dir=opt.output_dir)
+    iPER_MI_evaluator = IPERMotionImitationEvaluator(data_dir=opt.data_dir)
 
     iPER_MI_evaluator.evaluate(
         model=model,
