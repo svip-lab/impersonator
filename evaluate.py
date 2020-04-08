@@ -50,14 +50,14 @@ class LWGEvaluatorModel(MotionImitationModel):
         self_imitation = ref_infos["self_imitation"]
         if self_imitation:
             cam_strategy = "copy"
-            count = self.num_preds_si
             out_dir = self.si_out_dir
-            self.num_preds_ci += len(tgt_paths)
+            count = self.num_preds_si
+            self.num_preds_si += len(tgt_paths)
         else:
             cam_strategy = "smooth"
-            count = self.num_preds_ci
             out_dir = self.ci_out_dir
-            self.num_preds_si += len(tgt_paths)
+            count = self.num_preds_ci
+            self.num_preds_ci += len(tgt_paths)
         outputs = self.model.inference(tgt_paths, tgt_smpls=tgt_smpls, cam_strategy=cam_strategy,
                                        visualizer=None, verbose=True)
 
@@ -99,13 +99,13 @@ class LWGEvaluatorModel(MotionImitationModel):
                 ...
         """
 
-        # 1. load the pretrain model
-        self.model._load_params(self.model.generator, self.opt.load_path)
-
-        # 2. post personalization
-        if self.opt.post_tune:
-            self.opt.src_path = src_infos["images"][0]
-            adaptive_personalize(self.opt, self.model, self.visualizer)
+        # # 1. load the pretrain model
+        # self.model._load_params(self.model.generator, self.opt.load_path)
+        #
+        # # 2. post personalization
+        # if self.opt.post_tune:
+        #     self.opt.src_path = src_infos["images"][0]
+        #     adaptive_personalize(self.opt, self.model, self.visualizer)
 
         processed_src_infos = src_infos
         return processed_src_infos

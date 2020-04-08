@@ -4,7 +4,7 @@ data_dir="/p300/tpami/iPER"  # need to be replaced!!!!!
 output_dir="/p300/tpami/baselines/WarpingStrategy/LWB-add/evaluations/iPER"  # need to be replaced!!!!!
 
 ##
-gpu=6
+gpu=8
 gen_name="impersonator"
 name="imper_results"
 checkpoints_dir="./outputs/checkpoints/"
