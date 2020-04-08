@@ -200,7 +200,6 @@ class BaseMetric(object):
 
                 use_gpu = self.device != "cpu"
                 model = PerceptualLoss(model='net-lin', net='alex', use_gpu=use_gpu)
-                model = model.to(self.device)
 
                 self.model_zoos[key] = model
 
@@ -690,7 +689,9 @@ class FreIDMetric(BaseMetric):
         self.register_model(self.REID)
 
     def preprocess(self, x):
-        pass
+        x = x.clone()
+        x = x.to(self.device)
+        return x
 
     def forward(self, pred):
         """
@@ -704,7 +705,8 @@ class FreIDMetric(BaseMetric):
         """
 
         with torch.no_grad():
-            feat = self.model_zoos[self.REID](pred.to(self.device))
+            pred = self.preprocess(pred)
+            feat = self.model_zoos[self.REID](pred)
             feat = feat.cpu().numpy()
         return feat
 

@@ -1,4 +1,5 @@
 import os
+import torch
 from typing import Dict, Any, List
 # evaluations
 from his_evaluators import MotionImitationModel, IPERMotionImitationEvaluator
@@ -122,13 +123,14 @@ class LWGEvaluatorModel(MotionImitationModel):
 if __name__ == "__main__":
     opt = TestOptions().parse()
 
-    model = LWGEvaluatorModel(opt, output_dir="/p300/iccv/baselines/WarpingStrategy/LWB-add/evaluations/iPER")
-    iPER_MI_evaluator = IPERMotionImitationEvaluator(data_dir="/p300/iccv/iPER")
+    model = LWGEvaluatorModel(opt, output_dir="/p300/tpami/baselines/WarpingStrategy/LWB-add/evaluations/iPER")
+    iPER_MI_evaluator = IPERMotionImitationEvaluator(data_dir="/p300/tpami/iPER")
 
     iPER_MI_evaluator.evaluate(
         model=model,
         image_size=opt.image_size,
         pair_types=("ssim", "psnr", "lps"),
-        unpair_types=("is", "fid", "PCB-CS-reid", "PCB-freid", "OS-CS-reid", "OS-freid")
+        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "PCB-CS-reid", "PCB-freid"),
+        device=torch.device("cuda:0")
     )
 

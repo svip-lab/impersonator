@@ -1,4 +1,5 @@
 from abc import ABC
+import torch
 from multiprocessing import Process, Manager
 from tqdm import tqdm
 from typing import List, Dict, Any
@@ -98,7 +99,6 @@ class MotionImitationRunnerProcessor(Process):
         super().__init__()
 
     def run(self):
-
         self.model.build_model()
 
         # si means self-imitation
@@ -129,6 +129,8 @@ class MotionImitationRunnerProcessor(Process):
 
             all_si_preds_ref_file_list.extend(si_pred_ref_files)
             all_ci_preds_ref_file_list.extend(ci_pred_ref_files)
+
+            break
 
         self.return_dict["all_si_preds_ref_file_list"] = all_si_preds_ref_file_list
         self.return_dict["all_ci_preds_ref_file_list"] = all_ci_preds_ref_file_list
@@ -163,9 +165,14 @@ class MotionImitationEvaluator(Evaluator, ABC):
         self.paired_metrics_runner = None
         self.unpaired_metrics_runner = None
 
-    def build_metrics(self, pair_types=("ssim", "psnr", "lps"), unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid")):
-        paired_metrics_runner = PairedMetricRunner(metric_types=pair_types)
-        unpaired_metrics_runner = UnpairedMetricRunner(metric_types=unpair_types)
+    def build_metrics(
+        self,
+        pair_types=("ssim", "psnr", "lps"),
+        unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid"),
+        device=torch.device("cpu")
+    ):
+        paired_metrics_runner = PairedMetricRunner(metric_types=pair_types, device=device)
+        unpaired_metrics_runner = UnpairedMetricRunner(metric_types=unpair_types, device=device)
 
         self.paired_metrics_runner = paired_metrics_runner
         self.unpaired_metrics_runner = unpaired_metrics_runner
@@ -217,8 +224,8 @@ class IPERMotionImitationEvaluator(MotionImitationEvaluator):
 
     def evaluate(self, model, image_size=512,
                  pair_types=("ssim", "psnr", "lps"),
-                 unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid")):
-
+                 unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid"),
+                 device=torch.device("cpu")):
         # 1. setup protocols
         self.protocols.setup(num_sources=1, load_smpls=True, load_kps=True)
 
@@ -233,6 +240,5 @@ class IPERMotionImitationEvaluator(MotionImitationEvaluator):
         all_ci_preds_ref_file_list = return_dict["all_ci_preds_ref_file_list"]
 
         # run metrics
-        self.build_metrics(pair_types, unpair_types)
+        self.build_metrics(pair_types, unpair_types, device)
         self.run_metrics(all_si_preds_ref_file_list, all_ci_preds_ref_file_list, image_size)
-

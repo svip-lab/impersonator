@@ -279,4 +279,6 @@ class IPERProtocol(Protocol):
 
 
 class ICCVIPERProtocol(IPERProtocol):
-    raise NotImplementedError
+    def __init__(self, data_dir="/home/piaozx/liuwen/p300/human_pose/processed"):
+        super().__init__(data_dir)
+        # TODO
