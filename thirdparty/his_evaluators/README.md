@@ -11,6 +11,10 @@ cd thirdparty/his_evaluators
 pip install -e .
 ```
 
+### Download pre-trained models
+Manually download [PCB models](https://drive.google.com/open?id=1XVEYb0TN2SbBYOqf8SzazfYZlpH9CxyE),
+unzip `models.zip` and move to `thirdparth/his_evaluators/his_evaluators/PCBreid`
+
 ### Usage
 
 #### 1. Example
