@@ -129,9 +129,7 @@ class MotionImitationRunnerProcessor(Process):
 
             all_si_preds_ref_file_list.extend(si_pred_ref_files)
             all_ci_preds_ref_file_list.extend(ci_pred_ref_files)
-
-            break
-
+            
         self.return_dict["all_si_preds_ref_file_list"] = all_si_preds_ref_file_list
         self.return_dict["all_ci_preds_ref_file_list"] = all_ci_preds_ref_file_list
 
