@@ -180,7 +180,7 @@ focuses on the cropped front person region of the synthesized images, and `face-
 
 For cross-imitation (unpair_types), 
 1. for each video with person id `i`, we denote the input source image of person `i` as 
-<a href="https://www.codecogs.com/eqnedit.php?latex=I^i_s" target="_blank"><img src="https://latex.codecogs.com/gif.latex?I^i_s" title="I^i_s" /></a> 
+![](https://latex.codecogs.com/gif.latex?I^i_s)
 or <a href="https://www.codecogs.com/eqnedit.php?latex=\{I^i_{s_1},&space;...,&space;I^i_{s_n}\}" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\{I^i_{s_1},&space;...,&space;I^i_{s_n}\}" title="\{I^i_{s_1}, ..., I^i_{s_n}\}" /></a>;
 
 2. we sample n consective frames from the source video with person `i`, and denote them as 
