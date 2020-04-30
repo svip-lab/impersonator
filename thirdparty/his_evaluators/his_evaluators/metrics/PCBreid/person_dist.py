@@ -16,10 +16,11 @@ class Config(object):
     pass
 
 
-def create_model(name='PCB', model_dir='./model'):
+def create_model(name='PCB', pretrain_path='./model'):
     cfg = Config()
 
-    config_path = os.path.join(model_dir, name, 'opts.yaml')
+    config_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(config_dir, 'model', name, 'opts.yaml')
     with open(config_path, 'r') as stream:
         config = yaml.load(stream)
 
@@ -52,8 +53,7 @@ def create_model(name='PCB', model_dir='./model'):
     if cfg.PCB:
         model_structure = PCB(cfg.nclasses)
 
-    save_path = os.path.join(model_dir, name, 'net_last.pth')
-    model_structure.load_state_dict(torch.load(save_path))
+    model_structure.load_state_dict(torch.load(pretrain_path))
 
     if cfg.PCB:
         model_structure = PCB_test(model_structure)
@@ -66,9 +66,9 @@ def create_model(name='PCB', model_dir='./model'):
 
 class PCBReIDMetric(nn.Module):
 
-    def __init__(self, name, model_dir='./model'):
+    def __init__(self, name, pretrain_path):
         super(PCBReIDMetric, self).__init__()
-        self.model, self.opt = create_model(name, model_dir)
+        self.model, self.opt = create_model(name, pretrain_path)
         self.model.eval()
 
         self.mean = [0.485, 0.456, 0.406]
@@ -94,14 +94,12 @@ class PCBReIDMetric(nn.Module):
         """
 
         Args:
-            images (torch.tensor): [bs, 3, height, width] is in range of [0, 255] with torch.uint8
+            images (torch.tensor): [bs, 3, height, width] is in range of [0, 255] with torch.float32
             bboxs (torch.tensor or None): [(4,), (4,), ..., (4,)] with np.int32
 
         Returns:
             crop (torch.tensor): (bs, 3, resize_height, resize_width)
         """
-        images = images.float()
-        images /= 255.0
 
         if bboxs is None:
             crop_imgs = F.interpolate(
@@ -113,8 +111,12 @@ class PCBReIDMetric(nn.Module):
             crop_imgs = []
             for i in range(bs):
                 x = images[i]
-                x0, y0, x1, y1 = bboxs[i]
-                crop = x[:, y0:y1, x0:x1]
+                box = bboxs[i]
+                if box is not None:
+                    x0, y0, x1, y1 = box
+                    crop = x[:, y0:y1, x0:x1]
+                else:
+                    crop = x
                 crop = transform_func.normalize(crop, mean=self.mean, std=self.std)
                 crop.unsqueeze_(0)
                 crop = F.interpolate(crop, size=(self.opt.height, self.opt.width), mode="bilinear", align_corners=True)

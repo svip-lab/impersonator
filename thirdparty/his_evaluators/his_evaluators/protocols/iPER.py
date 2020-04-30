@@ -8,7 +8,7 @@ from ..utils.io import load_json_file, load_pickle_file
 
 class IPERProtocol(Protocol):
 
-    def __init__(self, data_dir="/home/piaozx/liuwen/p300/human_pose/processed"):
+    def __init__(self, data_dir="/p300/iPER"):
         super().__init__()
 
         # the root directory of iPER, need to be replaced!
@@ -16,11 +16,8 @@ class IPERProtocol(Protocol):
         self.train_ids_file = "train.txt"
         self.test_ids_file = "val.txt"
         self.eval_path = "iPER_protocol.json"
+        self.images_folder = "images_HD"
         self.smpls_folder = "smpls"
-        # self.images_folder = "iPER_1024_video_release"
-        # self.images_folder = "iPER_256_video_release"
-        # self.images_folder = "images_HD"
-        self.images_folder = "images"
 
         """
         "001/9/1": {
@@ -282,6 +279,119 @@ class IPERProtocol(Protocol):
 
 
 class ICCVIPERProtocol(IPERProtocol):
-    def __init__(self, data_dir="/home/piaozx/liuwen/p300/human_pose/processed"):
+    def __init__(self, data_dir="/p300/iPER"):
         super().__init__(data_dir)
-        # TODO
+
+    def __len__(self):
+        return len(self.vid_names) * 3
+
+    def __getitem__(self, item):
+        """
+
+        Args:
+            item:
+
+        Returns:
+            eval_info (dict): the information for evaluation, it contains:
+
+                --source (dict):
+                    --s_n (str): dict map of from number of source (s_n) to source images
+                    --name (str): the video name of source (`001/9/1`)
+                    --formated_name (str): the formated video name of source (`001_9_1`);
+                    --vid_path (str):
+                    --images (list of str):
+                    --smpls (np.ndarray or None):
+                    --kps (np.ndarray or None):
+
+                --self_imitation (dict):
+                    --images (list of str):
+                    --smpls (np.ndarray or None):
+                    --kps (np.ndarray or None):
+                    --self_imitation (bool): True
+
+                --cross_imitation (dict):
+                    --images (list of str):
+                    --smpls (np.ndarray or None):
+                    --kps (np.ndarray or None):
+                    --self_imitation (bool): False
+
+                --flag (list of str):
+        """
+        self._num_source = 1
+        self._load_smpls = True
+        self._load_kps = True
+        num_sources = self._num_source
+        load_smpls = self._load_smpls
+        load_kps = self._load_kps
+
+        vid_ids = item // 3
+        src_ids = item % 3
+
+        vid_name = self.vid_names[vid_ids]
+        vid_info = self.eval_info[vid_name]
+
+        eval_info = dict()
+
+        # 1. source information
+        src_vid_smpls = self.get_smpls(vid_name)
+        src_vid_kps = self.get_kps(vid_name)
+
+        src_vid_path = os.path.join(self.data_dir, self.images_folder, vid_name)
+        src_img_paths = glob.glob(os.path.join(src_vid_path, "*"))
+        src_img_paths.sort()
+
+        src_img_names = vid_info["s_n"]["3"][src_ids:src_ids+1]
+        src_img_ids = [int(t.split(".")[0]) for t in src_img_names]
+        eval_info["source"] = {
+            "s_n": num_sources,
+            "name": vid_name,
+            "formated_name": self.format_name(vid_name),
+            "vid_path": os.path.join(self.data_dir, self.images_folder, vid_name),
+            "images": [src_img_paths[t] for t in src_img_ids],
+            "smpls": src_vid_smpls[src_img_ids] if load_smpls else None,
+            "kps": src_vid_kps[src_img_ids] if load_kps else None
+        }
+
+        # 2. self-imitation
+        self_imitation = vid_info["self_imitation"]
+
+        eval_info["self_imitation"] = {
+            "name": self_imitation["target"],
+            "formated_name": self.format_name(self_imitation["target"]),
+            "images": src_img_paths[self_imitation["range"][0]: self_imitation["range"][1] + 1],
+            "smpls": src_vid_smpls[self_imitation["range"][0]: self_imitation["range"][1] + 1] if load_smpls else None,
+            "kps": src_vid_kps[self_imitation["range"][0]: self_imitation["range"][1] + 1] if load_kps else None,
+            "self_imitation": True
+        }
+
+        # 2. cross-imitation
+        cross_imitation = vid_info["cross_imitation"]
+        target_vid_name = cross_imitation["target"]
+        target_vid_smpls = self.get_smpls(target_vid_name)
+        target_vid_kps = self.get_kps(target_vid_name)
+        cross_images_paths = self.take_images_paths(
+            vid_name=target_vid_name,
+            start=cross_imitation["range"][0],
+            end=cross_imitation["range"][1]
+        )
+        eval_info["cross_imitation"] = {
+            "name": target_vid_name,
+            "formated_name": self.format_name(target_vid_name),
+            "images": cross_images_paths,
+            "smpls": target_vid_smpls[
+                     cross_imitation["range"][0]: cross_imitation["range"][1] + 1] if load_smpls else None,
+            "kps": target_vid_kps[
+                   cross_imitation["range"][0]: cross_imitation["range"][1] + 1] if load_kps else None,
+            "self_imitation": False
+        }
+
+        eval_info["flag"] = self.take_images_paths(
+            vid_name=vid_name,
+            start=vid_info["flag"][0],
+            end=vid_info["flag"][1]
+        )
+
+        # print(vid_name, cross_imitation["range"][1] - cross_imitation["range"][0],
+        #       vid_info["flag"][1] - vid_info["flag"][0])
+        assert cross_imitation["range"][1] - cross_imitation["range"][0] == vid_info["flag"][1] - vid_info["flag"][0]
+        return eval_info

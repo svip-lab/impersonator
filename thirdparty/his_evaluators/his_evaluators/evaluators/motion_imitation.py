@@ -5,6 +5,8 @@ from tqdm import tqdm
 from typing import List, Dict, Any
 import os
 
+from his_evaluators.metrics import TYPES_QUALITIES
+
 from .base import PairedMetricRunner, UnpairedMetricRunner, Evaluator
 from ..utils.io import mkdir
 
@@ -130,6 +132,8 @@ class MotionImitationRunnerProcessor(Process):
             all_si_preds_ref_file_list.extend(si_pred_ref_files)
             all_ci_preds_ref_file_list.extend(ci_pred_ref_files)
 
+            # break
+
         self.return_dict["all_si_preds_ref_file_list"] = all_si_preds_ref_file_list
         self.return_dict["all_ci_preds_ref_file_list"] = all_ci_preds_ref_file_list
 
@@ -163,6 +167,9 @@ class MotionImitationEvaluator(Evaluator, ABC):
         self.paired_metrics_runner = None
         self.unpaired_metrics_runner = None
 
+    def reset_dataset(self, dataset, data_dir):
+        super().__init__(dataset, data_dir)
+
     def build_metrics(
         self,
         pair_types=("ssim", "psnr", "lps"),
@@ -180,8 +187,10 @@ class MotionImitationEvaluator(Evaluator, ABC):
             "please call `build_metrics(pair_types, unpair_types)` to instantiate metrics runners " \
             "before calling this function."
 
-        self.paired_metrics_runner.evaluate(self_imitation_files, image_size)
-        self.unpaired_metrics_runner.evaluate(cross_imitation_files, image_size)
+        si_results = self.paired_metrics_runner.evaluate(self_imitation_files, image_size)
+        ci_results = self.unpaired_metrics_runner.evaluate(cross_imitation_files, image_size)
+
+        return si_results, ci_results
 
     def evaluate(self, *args, **kwargs):
         raise NotImplementedError
@@ -191,8 +200,9 @@ class MotionImitationEvaluator(Evaluator, ABC):
 
 
 class IPERMotionImitationEvaluator(MotionImitationEvaluator):
-    def __init__(self, data_dir):
-        super().__init__(dataset="iPER", data_dir=data_dir)
+
+    def __init__(self, data_dir, dataset="iPER"):
+        super().__init__(dataset=dataset, data_dir=data_dir)
 
     def run_inference(self, model, src_infos, ref_infos):
         """
@@ -220,12 +230,12 @@ class IPERMotionImitationEvaluator(MotionImitationEvaluator):
 
         return file_paths
 
-    def evaluate(self, model, image_size=512,
+    def evaluate(self, model, num_sources=1, image_size=512,
                  pair_types=("ssim", "psnr", "lps"),
                  unpair_types=("is", "fid", "PCB-freid", "PCB-CS-reid"),
                  device=torch.device("cpu")):
         # 1. setup protocols
-        self.protocols.setup(num_sources=1, load_smpls=True, load_kps=True)
+        self.protocols.setup(num_sources=num_sources, load_smpls=True, load_kps=True)
 
         # 2. declare runner processor for inference
         return_dict = Manager().dict({})
@@ -234,9 +244,37 @@ class IPERMotionImitationEvaluator(MotionImitationEvaluator):
         runner.join()
 
         del model
+
         all_si_preds_ref_file_list = return_dict["all_si_preds_ref_file_list"]
         all_ci_preds_ref_file_list = return_dict["all_ci_preds_ref_file_list"]
 
         # run metrics
         self.build_metrics(pair_types, unpair_types, device)
-        self.run_metrics(all_si_preds_ref_file_list, all_ci_preds_ref_file_list, image_size)
+        si_results, ci_results = self.run_metrics(all_si_preds_ref_file_list, all_ci_preds_ref_file_list, image_size)
+
+        return si_results, ci_results
+
+    def preprocess(self, *args, **kwargs):
+        pass
+
+    def save_results(self, out_path, si_results, ci_result):
+        """
+            save the the results into the out_path.
+        Args:
+            out_path (str): the full path to save the results.
+            si_results (dict): the self-imitation results.
+            ci_result (dict): the cross-imitation results.
+
+        Returns:
+            None
+        """
+
+        with open(out_path, "w") as writer:
+            writer.write("########################Self-imitation Results########################\n")
+            for key, val in si_results.items():
+                writer.write("{} = {}, quality = {}\n".format(key, val, TYPES_QUALITIES[key]))
+
+            writer.write("########################Cross-imitation Results########################\n")
+            for key, val in ci_result.items():
+                writer.write("{} = {}, quality = {}\n".format(key, val, TYPES_QUALITIES[key]))
+

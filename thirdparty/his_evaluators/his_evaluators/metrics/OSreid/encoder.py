@@ -75,14 +75,12 @@ class OsNetEncoder(object):
         """
 
         Args:
-            images (torch.tensor): (bs, 3, height, width) is in the range [0, 255] with torch.uint8.
+            images (torch.tensor): (bs, 3, height, width) is in the range [0, 1] with torch.float32.
             bboxes (torch.tensor, np.ndarray, list or None): [(4,), (4,), ..., (4,)], (4,) = (x0, y0, x1, y1)
 
         Returns:
             feats (torch.tensor): (bs, dim)
         """
-        images = images.float()
-        images /= 255.0
 
         if bboxes is None:
             crop_imgs = F.interpolate(images, size=self.patch_size, mode="bilinear", align_corners=True)
@@ -90,10 +88,15 @@ class OsNetEncoder(object):
             bs = images.shape[0]
             crop_imgs = []
             for i in range(bs):
-                x = images[i:i+1]
-                x0, y0, x1, y1 = bboxes[i]
-                crop = x[:, :, y0:y1, x0:x1]
+                x = images[i]
+                box = bboxes[i]
+                if box is not None:
+                    x0, y0, x1, y1 = box
+                    crop = x[:, y0:y1, x0:x1]
+                else:
+                    crop = x
                 crop = transform_func.normalize(crop, mean=self.norm_mean, std=self.norm_std)
+                crop.unsqueeze_(0)
                 crop = F.interpolate(crop, size=self.patch_size, mode="bilinear", align_corners=True)
                 crop_imgs.append(crop)
             crop_imgs = torch.cat(crop_imgs, dim=0)

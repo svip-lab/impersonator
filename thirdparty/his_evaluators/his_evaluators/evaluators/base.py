@@ -70,7 +70,7 @@ class PairedMetricRunner(object):
 
         return metric_results
 
-    def evaluate(self, file_paths, image_size=512, batch_size=32):
+    def evaluate(self, file_paths, image_size=512, batch_size=16):
         dataset = PairedEvaluationDataset(file_paths, image_size=image_size)
         dataloader = build_data_loader(dataset, batch_size=batch_size)
 
@@ -98,37 +98,45 @@ class PairedMetricRunner(object):
 
 class UnpairedMetricRunner(object):
     def __init__(self,
-                 metric_types=("is", "fid", "PCB-CS-reID", "PCB-CS-freid"),
+                 metric_types=("is", "fid", "OS-CS-reID", "OS-freid", "face-CS", "face-FD"),
                  device=torch.device("cpu")):
 
-        if isinstance(metric_types, tuple):
-            metric_types = list(metric_types)
+        metric_types = set(metric_types)
 
         if "is" in metric_types and "fid" not in metric_types:
-            metric_types.append("fid")
+            metric_types.add("fid")
 
         add_PCB = False
         add_OSNET = False
+        add_FACE = False
         for m_t in metric_types:
             if "PCB" in m_t:
                 add_PCB = True
             if "OS" in m_t:
                 add_OSNET = True
+            if "face" in m_t:
+                add_FACE = True
 
         if add_PCB:
-            metric_types.append("PCB-freid")
+            metric_types.add("PCB-freid")
 
         if add_OSNET:
-            metric_types.append("OS-freid")
+            metric_types.add("OS-freid")
 
-        self.metric_types = metric_types
-        self.metric_dict = register_metrics(metric_types, device)
+        if add_FACE:
+            metric_types.add("face-CS")
+
+        self.metric_types = tuple(metric_types)
+        self.metric_dict = register_metrics(self.metric_types, device, has_detector=True)
 
         self.get_is_feats = False
         self.get_fid_feats = False
         self.get_osnet_feats = False
         self.get_pcb_feats = False
         self.get_cs_reid = False
+        self.get_face_feats = False
+        self.get_face_cs = False
+        self.get_sspe = False
 
     def build_metric_results(self, metric_types):
         metric_results = dict()
@@ -147,25 +155,39 @@ class UnpairedMetricRunner(object):
                 self.get_pcb_feats = True
                 metric_results["pcb_feats"] = {
                     "pred": [],
-                    "ref": []
+                    "ref": [],
+                    "CS": []
                 }
-                if "-CS-" in m_t:
+                if "-CS" in m_t:
                     self.get_cs_reid = True
-                    metric_results["PCB-CS-reid"] = []
 
             elif "OS" in m_t:
                 self.get_osnet_feats = True
                 metric_results["osnet_feats"] = {
                     "pred": [],
-                    "ref": []
+                    "ref": [],
+                    "CS": []
                 }
-                if "-CS-" in m_t:
+                if "-CS" in m_t:
                     self.get_cs_reid = True
-                    metric_results["OS-CS-reid"] = []
+
+            elif "face" in m_t:
+                self.get_face_feats = True
+                metric_results["face_feats"] = {
+                    "pred": [],
+                    "ref": [],
+                    "CS": []
+                }
+                if "-CS" in m_t:
+                    self.get_face_cs = True
+
+            elif "SSPE" in m_t:
+                self.get_sspe = True
+                metric_results["SSPE"] = []
 
         return metric_results
 
-    def evaluate(self, file_paths, image_size=512, batch_size=4):
+    def evaluate(self, file_paths, image_size=512, batch_size=16):
         """
         Args:
             file_paths:
@@ -204,7 +226,7 @@ class UnpairedMetricRunner(object):
 
                 if self.get_cs_reid:
                     cs_score = self.metric_dict["OS-freid"].cosine_similarity(osnet_preds, osnet_refs)
-                    metric_results["OS-CS-reid"].append(cs_score)
+                    metric_results["osnet_feats"]["CS"].append(cs_score)
 
             if self.get_pcb_feats:
                 pcb_preds = self.metric_dict["PCB-freid"].forward(pred_imgs)
@@ -214,7 +236,22 @@ class UnpairedMetricRunner(object):
 
                 if self.get_cs_reid:
                     cs_score = self.metric_dict["PCB-freid"].cosine_similarity(pcb_preds, pcb_refs)
-                    metric_results["PCB-CS-reid"].append(cs_score)
+                    metric_results["pcb_feats"]["CS"].append(cs_score)
+
+            if self.get_face_feats:
+                face_preds, _ = self.metric_dict["face-CS"].forward(pred_imgs)
+                face_refs, valid_ids = self.metric_dict["face-CS"].forward(ref_imgs)
+
+                metric_results["face_feats"]["pred"].append(face_preds[valid_ids])
+                metric_results["face_feats"]["ref"].append(face_refs[valid_ids])
+
+                if self.get_face_cs:
+                    cs_score = self.metric_dict["face-CS"].cosine_similarity(face_preds, face_refs)
+                    metric_results["face_feats"]["CS"].append(cs_score)
+
+            if self.get_sspe:
+                sspe = self.metric_dict["SSPE"].calculate_score(pred_imgs, ref_imgs)
+                metric_results["SSPE"].append(sspe)
 
         results = self.post_process_results(metric_results)
 
@@ -231,14 +268,17 @@ class UnpairedMetricRunner(object):
     def post_process_results(self, metric_results):
 
         for key in metric_results:
-            if key == "PCB-CS-reid" or key == "OS-CS-reid":
+
+            if key == "SSPE":
                 continue
 
-            if key == "inception_softmax":
+            if key == "inception_softmax" :
                 metric_results[key] = np.concatenate(metric_results[key], axis=0)
                 continue
 
             for sub_key in metric_results[key]:
+                if sub_key == "CS":
+                    continue
                 feats = metric_results[key][sub_key]
                 metric_results[key][sub_key] = np.concatenate(feats, axis=0)
 
@@ -264,7 +304,7 @@ class UnpairedMetricRunner(object):
             print("OS-freid = {}, quality = {}".format(results["OS-freid"], TYPES_QUALITIES["OS-freid"]))
 
             if self.get_cs_reid:
-                results["OS-CS-reid"] = np.mean(metric_results["OS-CS-reid"])
+                results["OS-CS-reid"] = np.mean(metric_results["osnet_feats"]["CS"])
 
                 print("OS-CS-reid = {}, quality = {}".format(results["OS-CS-reid"], TYPES_QUALITIES["OS-CS-reid"]))
 
@@ -276,9 +316,27 @@ class UnpairedMetricRunner(object):
             print("PCB-freid = {}, quality = {}".format(results["PCB-freid"], TYPES_QUALITIES["PCB-freid"]))
 
             if self.get_cs_reid:
-                results["PCB-CS-reid"] = np.mean(metric_results["PCB-CS-reid"])
+                results["PCB-CS-reid"] = np.mean(metric_results["pcb_feats"]["CS"])
 
                 print("PCB-CS-reid = {}, quality = {}".format(results["PCB-CS-reid"], TYPES_QUALITIES["PCB-CS-reid"]))
+
+        if self.get_face_feats:
+            pred_feats = metric_results["face_feats"]["pred"]
+            ref_feats = metric_results["face_feats"]["ref"]
+
+            length = len(ref_feats)
+            if length == 0:
+                print("there is no face detected! We can not compute face-FD and face-CS.")
+            else:
+                results["face-FD"] = BaseMetric.fid_score_func(pred_feats, ref_feats)
+                print("face-FD = {}, quality = {}".format(results["face-FD"], TYPES_QUALITIES["face-FD"]))
+                if self.get_face_cs:
+                    results["face-CS"] = np.mean(metric_results["face_feats"]["CS"])
+                    print("face-CS = {}, quality = {}".format(results["face-CS"], TYPES_QUALITIES["face-CS"]))
+
+        if self.get_sspe:
+            results["SSPE"] = np.mean(metric_results["SSPE"])
+            print("SSPE = {}, quality = {}".format(results["SSPE"], TYPES_QUALITIES["SSPE"]))
 
         return results
 
@@ -298,4 +356,7 @@ class Evaluator(object):
         raise NotImplementedError
 
     def evaluate(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def preprocess(self, *args, **kwargs):
         raise NotImplementedError

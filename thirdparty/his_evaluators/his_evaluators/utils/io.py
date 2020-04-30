@@ -32,7 +32,7 @@ def load_img(img_path, image_size):
         image_size:
 
     Returns:
-        img (np.ndarray): [3, image_size, image_size], np.uint8, RGB channel, [0, 255] intensity.
+        img (np.ndarray): [3, image_size, image_size], np.float32, RGB channel, [0, 1] intensity.
     """
     img = cv2.imread(img_path)
 
@@ -41,4 +41,6 @@ def load_img(img_path, image_size):
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, (2, 0, 1))
+    img = img.astype(np.float32, copy=False)
+    img /= 255
     return img

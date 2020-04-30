@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 from typing import Dict, Any, List
 # evaluations
 from his_evaluators import MotionImitationModel, IPERMotionImitationEvaluator
@@ -46,7 +47,7 @@ class LWGEvaluatorModel(MotionImitationModel):
         """
 
         tgt_paths = ref_infos["images"]
-        tgt_smpls = ref_infos["smpls"]
+        tgt_smpls = np.copy(ref_infos["smpls"])
         self_imitation = ref_infos["self_imitation"]
         if self_imitation:
             cam_strategy = "copy"
@@ -58,16 +59,24 @@ class LWGEvaluatorModel(MotionImitationModel):
             out_dir = self.ci_out_dir
             count = self.num_preds_ci
             self.num_preds_ci += len(tgt_paths)
-        outputs = self.model.inference(tgt_paths, tgt_smpls=tgt_smpls, cam_strategy=cam_strategy,
-                                       visualizer=None, verbose=True)
+        # outputs = self.model.inference(tgt_paths, tgt_smpls=tgt_smpls, cam_strategy=cam_strategy,
+        #                                visualizer=None, verbose=True)
+        #
+        # all_preds_files = []
+        # for i, preds in enumerate(outputs):
+        #     filename = "{:0>8}.jpg".format(count)
+        #     pred_file = os.path.join(out_dir, 'pred_' + filename)
+        #     count += 1
+        #
+        #     cv_utils.save_cv2_img(preds, pred_file, normalize=True)
+        #     all_preds_files.append(pred_file)
 
         all_preds_files = []
-        for i, preds in enumerate(outputs):
+        for i in range(len(tgt_smpls)):
             filename = "{:0>8}.jpg".format(count)
             pred_file = os.path.join(out_dir, 'pred_' + filename)
             count += 1
 
-            cv_utils.save_cv2_img(preds, pred_file, normalize=True)
             all_preds_files.append(pred_file)
 
         return all_preds_files
@@ -101,12 +110,13 @@ class LWGEvaluatorModel(MotionImitationModel):
 
         # 1. load the pretrain model
         self.model._load_params(self.model.generator, self.opt.load_path)
+        self.opt.src_path = src_infos["images"][0]
 
         # 2. post personalization
         if self.opt.post_tune:
-            self.opt.src_path = src_infos["images"][0]
             adaptive_personalize(self.opt, self.model, self.visualizer)
 
+        self.model.personalize(self.opt.src_path, src_smpl=np.copy(src_infos["smpls"][0]), visualizer=None)
         processed_src_infos = src_infos
         return processed_src_infos
 
@@ -124,13 +134,14 @@ if __name__ == "__main__":
     opt = TestOptions().parse()
 
     model = LWGEvaluatorModel(opt, output_dir=opt.output_dir)
-    iPER_MI_evaluator = IPERMotionImitationEvaluator(data_dir=opt.data_dir)
+    # iPER_MI_evaluator = IPERMotionImitationEvaluator(dataset="iPER", data_dir=opt.data_dir)
+    iPER_MI_evaluator = IPERMotionImitationEvaluator(dataset="iPER_ICCV", data_dir=opt.data_dir)
 
     iPER_MI_evaluator.evaluate(
         model=model,
         image_size=opt.image_size,
-        pair_types=("ssim", "psnr", "lps"),
-        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "PCB-CS-reid", "PCB-freid"),
+        pair_types=("ssim", "psnr", "lps", "face-CS", "OS-CS-reid"),
+        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "face-CS", "face-FD", "PCB-CS-reid", "PCB-freid"),
         device=torch.device("cuda:0")
     )
 

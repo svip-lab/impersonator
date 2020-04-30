@@ -28,7 +28,7 @@ setup(
         "opencv_contrib_python >= 3.2",
         "tqdm >= 4.38.0",
         "numpy >= 1.18.1",
-        "torch >= 1.2",
+        "torch >= 1.0",
         "setuptools >= 39.1.0",
         "Pillow == 6.2.0",
         "typing >= 3.7.4.1"

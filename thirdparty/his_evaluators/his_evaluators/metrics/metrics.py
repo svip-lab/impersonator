@@ -144,7 +144,7 @@ class InceptionV3(nn.Module):
 
             if idx == 3:
                 x = x[:, :, 0, 0]
-                
+
             if idx in self.output_blocks:
                 if len(x.shape) == 4 and (x.size(2) != 1 or x.size(3) != 1):
                     preds = F.adaptive_avg_pool2d(x, output_size=(1, 1)).squeeze_(-1).squeeze_(-1)
@@ -162,10 +162,19 @@ class BaseMetric(object):
 
     INCEPTION_V3 = 'inception_v3'
     PERCEPTUAL = 'perceptual'
+    HMR = "hmr"
+    FACE = "sphereface"
+    FACE_DETECTOR = "MTCNN"
+    FACE_FD = "inception_resnet_v1"
+    FACE_RECOGNITION = "inception_resnet_v1"
+    PERSON_DETECTOR = "YOLOv3"
     OSreID = 'OS-reid'
     PCBreID = 'PCB-reid'
 
-    MODEL_KEYS = [INCEPTION_V3, PERCEPTUAL, OSreID, PCBreID]
+    FACE_RECOGNITION_SIZE = 160
+
+    MODEL_KEYS = [INCEPTION_V3, PERCEPTUAL, HMR, FACE, PERSON_DETECTOR,
+                  OSreID, PCBreID, FACE_DETECTOR, FACE_RECOGNITION]
 
     LOWER = 'lower score is better.'
     HIGHER = 'higher score is better'
@@ -203,15 +212,27 @@ class BaseMetric(object):
 
                 self.model_zoos[key] = model
 
+            elif key == self.PERSON_DETECTOR:
+                from .yolov3 import YoLov3HumanDetector
+
+                data_dir = self.resource_dir
+
+                detector = YoLov3HumanDetector(
+                    weights_path=os.path.join(data_dir, "yolov3-spp.weights"),
+                    device=self.device
+                )
+                self.model_zoos[key] = detector
+
             elif key == self.OSreID:
                 from .OSreid import OsNetEncoder
 
-                dirpath = os.path.abspath(os.path.dirname(__file__))
+                data_dir = self.resource_dir
+
                 model = OsNetEncoder(
                     # input_width=704,
                     # input_height=480,
                     # weight_filepath="weights/model_weights.pth.tar-40",
-                    weight_filepath=os.path.join(dirpath, "OSreid", "osnet_ibn_x1_0_imagenet.pth"),
+                    weight_filepath=os.path.join(data_dir, "osnet_ibn_x1_0_imagenet.pth"),
                     input_height=self.size[0],
                     input_width=self.size[1],
                     batch_size=32,
@@ -226,16 +247,47 @@ class BaseMetric(object):
             elif key == self.PCBreID:
                 from .PCBreid import PCBReIDMetric
 
-                dirpath = os.path.abspath(os.path.dirname(__file__))
-                model_dir = os.path.join(dirpath, 'PCBreid', 'model')
+                data_dir = self.resource_dir
 
-                model = PCBReIDMetric(name='PCB', model_dir=model_dir)
+                model = PCBReIDMetric(name="PCB", pretrain_path=os.path.join(data_dir, "pcb_net_last.pth"))
                 model = model.to(self.device)
 
                 self.model_zoos[key] = model
 
+            elif key == self.HMR:
+                from .bodynets import HumanModelRecovery
+
+                data_dir = self.resource_dir
+
+                model = HumanModelRecovery(smpl_pkl_path=os.path.join(data_dir, "smpl_model.pkl"))
+                model_dict = torch.load(os.path.join(data_dir, "hmr_tf2pt.pth"))
+                model.load_state_dict(model_dict)
+                model = model.to(self.device)
+                model.eval()
+
+                self.model_zoos[key] = model
+
+            elif key == self.FACE_DETECTOR:
+                from .facenet_pytorch import MTCNN
+
+                mtcnn = MTCNN(image_size=self.FACE_RECOGNITION_SIZE, device=self.device)
+                self.model_zoos[key] = mtcnn
+
+            elif key == self.FACE_RECOGNITION:
+                from .facenet_pytorch import InceptionResnetV1
+
+                resnet = InceptionResnetV1(pretrained='vggface2', classify=False, device=self.device).eval()
+                self.model_zoos[key] = resnet
+
             else:
                 raise ValueError(key)
+
+    @property
+    def resource_dir(self):
+        dirpath = os.path.abspath(os.path.dirname(__file__))
+        data_dir = os.path.dirname(os.path.dirname(dirpath))
+        data_dir = os.path.join(data_dir, "data")
+        return data_dir
 
     def preprocess(self, x):
         raise NotImplementedError
@@ -319,9 +371,12 @@ class BaseMetric(object):
         Returns:
 
         """
-        m1, s1 = np.mean(pred_feats, axis=0), np.cov(pred_feats, rowvar=False)
-        m2, s2 = np.mean(gt_feats, axis=0), np.cov(gt_feats, rowvar=False)
-        return BaseMetric.calculate_frechet_distance(m1, s1, m2, s2)
+        if len(pred_feats) == 0 or len(gt_feats) == 0:
+            return 0
+        else:
+            m1, s1 = np.mean(pred_feats, axis=0), np.cov(pred_feats, rowvar=False)
+            m2, s2 = np.mean(gt_feats, axis=0), np.cov(gt_feats, rowvar=False)
+            return BaseMetric.calculate_frechet_distance(m1, s1, m2, s2)
 
     @staticmethod
     def is_score_func(feats_softmax):
@@ -339,6 +394,58 @@ class BaseMetric(object):
         score = np.exp(kl)
         return score
 
+    @staticmethod
+    def ssp_abs_err_score_func(src_smpls, ref_smpls):
+        """
+            The function of Scale-Shape-Pose absolution error score.
+        Args:
+            src_smpls (np.ndarray): (bs, 85),
+            ref_smpls (np.ndarray): (bs, 85).
+
+        Returns:
+            error (float): the absolution Scale-Shape-Pose error between the source and the reference smpls .
+        """
+
+        src_scale = src_smpls[:, 0]
+        ref_scale = ref_smpls[:, 0]
+
+        scale_error = np.mean(np.abs(src_scale - ref_scale))
+        shape_error = np.mean(np.sum(np.abs(src_smpls[:, -10:] - ref_smpls[:, -10:]), axis=1))
+        pose_error = np.mean(np.sum(np.abs(src_smpls[:, 0:-10] - ref_smpls[:, 0:-10]), axis=1))
+
+        error = scale_error + shape_error + pose_error
+
+        return error
+
+    @staticmethod
+    def normalize_feats(feats):
+        """
+
+        Args:
+            feats (np.ndarray): (bs, dim)
+
+        Returns:
+            feats (np.ndarray): (bs, dim)
+        """
+
+        norm = np.sqrt(np.sum(feats ** 2, axis=1, keepdims=True))
+        feats = feats / (norm + 1e-6)
+        return feats
+
+    def cosine_similarity(self, pred_feats, ref_feats, norm_first=True):
+
+        if len(pred_feats) == 0 or len(ref_feats) == 0:
+            return 0
+        else:
+            if norm_first:
+                pred_norm = self.normalize_feats(pred_feats)
+                ref_norm = self.normalize_feats(ref_feats)
+            else:
+                pred_norm = pred_feats
+                ref_norm = ref_feats
+
+            return np.mean(np.sum(pred_norm * ref_norm, axis=1))
+
 
 class SSIMMetric(BaseMetric):
 
@@ -348,9 +455,9 @@ class SSIMMetric(BaseMetric):
 
     def preprocess(self, x):
         """
-            normalize x from [0, 255] color intensity with np.uint8 to [-1, 1] with np.float32,
+            normalize x from [0, 1] color intensity with np.float32 to [-1, 1] with np.float32,
         Args:
-            x (np.ndarray or torch.tensor): [0, 255] color intensity, np.uint8 (torch.tensor),
+            x (np.ndarray or torch.tensor): [0, 1] color intensity, np.float32 (torch.tensor),
             shape = (3, image_size, image_size)
 
         Returns:
@@ -361,7 +468,6 @@ class SSIMMetric(BaseMetric):
         else:
             out = x.numpy().astype(np.float32, copy=True)
 
-        out /= 255
         out *= 2
         out -= 1
 
@@ -381,6 +487,8 @@ class SSIMMetric(BaseMetric):
         """
         # print(pred.shape, img.shape)
         # score = measure.compare_ssim(pred, ref, multichannel=True)
+        pred = self.preprocess(pred)
+        ref = self.preprocess(ref)
         score = skimage.metrics.structural_similarity(pred, ref, multichannel=True)
         return score
 
@@ -391,8 +499,6 @@ class SSIMMetric(BaseMetric):
         assert length == len(gts)
 
         for i, (pred, ref) in enumerate(zip(preds, gts)):
-            pred = self.preprocess(pred)
-            ref = self.preprocess(ref)
             scores.append(self.forward(pred, ref))
 
         return np.mean(scores)
@@ -408,9 +514,9 @@ class PSNRMetric(BaseMetric):
 
     def preprocess(self, x):
         """
-            normalize x from [0, 255] color intensity with np.uint8 to [-1, 1] with np.float32,
+            normalize x from [0, 1] color intensity with np.uint8 to [-1, 1] with np.float32,
         Args:
-            x (np.ndarray or torch.tensor): [0, 255] color intensity, np.uint8 (torch.tensor),
+            x (np.ndarray or torch.tensor): [0, 1] color intensity, np.float32 (torch.tensor),
             shape = (3, image_size, image_size)
 
         Returns:
@@ -421,7 +527,6 @@ class PSNRMetric(BaseMetric):
         else:
             out = x.numpy().astype(np.float32, copy=True)
 
-        out /= 255
         out *= 2
         out -= 1
 
@@ -441,7 +546,9 @@ class PSNRMetric(BaseMetric):
         """
 
         # score = measure.compare_psnr(pred, ref)
-        score = skimage.metrics.peak_signal_noise_ratio(pred, ref)
+        pred = self.preprocess(pred)
+        ref = self.preprocess(ref)
+        score = skimage.metrics.peak_signal_noise_ratio(image_true=ref, image_test=pred)
         return score
 
     def calculate_score(self, preds, gts):
@@ -451,8 +558,6 @@ class PSNRMetric(BaseMetric):
         assert length == len(gts)
 
         for i, (pred, ref) in enumerate(zip(preds, gts)):
-            pred = self.preprocess(pred)
-            ref = self.preprocess(ref)
             scores.append(self.forward(pred, ref))
 
         return np.mean(scores)
@@ -472,7 +577,7 @@ class PerceptualMetric(BaseMetric):
 
         Args:
             x (np.ndarray (or torch.tensor)): np.ndarray (or torch.tensor),
-            each element is [bs, 3, image_size, image_size] wth np.uint8 (torch.uint8) and color intensity [0, 255];
+            each element is [bs, 3, image_size, image_size] wth np.float32 (torch.float32) and color intensity [0, 1];
 
         Returns:
             out (torch.tensor): (bs, 3, image_size, image_size), color intensity [-1, 1]
@@ -481,9 +586,11 @@ class PerceptualMetric(BaseMetric):
             out = torch.tensor(x).float()
         else:
             out = x.clone().float()
-        out /= 255
+
         out *= 2
         out -= 1
+        # print(out.shape, out.max(), out.min(), out.device)
+        # print(self.device)
         out = out.to(self.device)
         return out
 
@@ -499,6 +606,8 @@ class PerceptualMetric(BaseMetric):
         """
 
         with torch.no_grad():
+            pred = self.preprocess(pred)
+            ref = self.preprocess(ref)
             # return 1.0 - torch.mean(self.model_zoos[self.PERCEPTUAL].forward(pred, target))
             return torch.mean(self.model_zoos[self.PERCEPTUAL].forward(pred, ref))
 
@@ -512,9 +621,6 @@ class PerceptualMetric(BaseMetric):
         for i in range(int(math.ceil((length / batch_size)))):
             pred_batch = preds[i * batch_size: (i + 1) * batch_size]
             gt_batch = gts[i * batch_size: (i + 1) * batch_size]
-
-            pred_batch = self.preprocess(pred_batch)
-            gt_batch = self.preprocess(gt_batch)
 
             s = self.forward(pred_batch, gt_batch)
             scores.append(s)
@@ -548,11 +654,10 @@ class InceptionScoreMetric(BaseMetric):
         """
 
         if isinstance(x, np.ndarray):
-            out = torch.tensor(x).float()
+            out = torch.tensor(x)
         else:
-            out = x.clone().float()
+            out = x.clone()
 
-        out /= 255
         out *= 2
         out -= 1
         out = out.to(self.device)
@@ -611,7 +716,8 @@ class FIDMetric(BaseMetric):
         """
 
         Args:
-            x (np.ndarray or torch.tensor): np.ndarray or torch.tensor, each element is [3, image_size, image_size] wth np.uint8 and color intensity [0, 255];
+            x (np.ndarray or torch.tensor): np.ndarray or torch.tensor, each element is
+                            [3, image_size, image_size] wth np.float32 and color intensity [0, 1];
 
         Returns:
             out (torch.tensor): (bs, 3, 299, 299), color intensity [0, 1] and normalized using
@@ -619,11 +725,10 @@ class FIDMetric(BaseMetric):
         """
 
         if isinstance(x, np.ndarray):
-            out = torch.tensor(x).float()
+            out = torch.tensor(x)
         else:
-            out = x.clone().float()
+            out = x.clone()
 
-        out /= 255
         out *= 2
         out -= 1
         out = out.to(self.device)
@@ -677,7 +782,7 @@ class FIDMetric(BaseMetric):
 
 
 class FreIDMetric(BaseMetric):
-    def __init__(self, device=torch.device("cpu"), reid_name="PCB-reid"):
+    def __init__(self, device=torch.device("cpu"), reid_name="PCB-reid", has_detector=True):
 
         BaseMetric.__init__(self, device)
 
@@ -685,10 +790,21 @@ class FreIDMetric(BaseMetric):
             self.REID = self.PCBreID
         else:
             self.REID = self.OSreID
-
         self.register_model(self.REID)
 
+        self.has_detector = has_detector
+        if has_detector:
+            self.register_model(self.PERSON_DETECTOR)
+
     def preprocess(self, x):
+        """
+
+        Args:
+            x (torch.tensor): (bs, 3, height, width) is in the range of [0, 1] with torch.float32.
+
+        Returns:
+            x (torch.tensor): (bs, 3, height, width) is in the range of [0, 1] with torch.float32.
+        """
         x = x.clone()
         x = x.to(self.device)
         return x
@@ -706,7 +822,13 @@ class FreIDMetric(BaseMetric):
 
         with torch.no_grad():
             pred = self.preprocess(pred)
-            feat = self.model_zoos[self.REID](pred)
+
+            if self.has_detector:
+                img_shapes = [pred.shape[2:]] * pred.shape[0]
+                boxes = self.model_zoos[self.PERSON_DETECTOR](pred, img_shapes, factor=1.05)
+            else:
+                boxes = None
+            feat = self.model_zoos[self.REID](pred, boxes)
             feat = feat.cpu().numpy()
         return feat
 
@@ -730,34 +852,14 @@ class FreIDMetric(BaseMetric):
 
         return self.fid_score_func(pred_feats, gt_feats)
 
-    def normalize_feats(self, feats):
-        """
-
-        Args:
-            feats (np.ndarray): (bs, dim)
-
-        Returns:
-            feats (np.ndarray): (bs, dim)
-        """
-
-        norm = np.sqrt(np.sum(feats ** 2, axis=1, keepdims=True))
-        feats = feats / (norm + 1e-6)
-        return feats
-
-    def cosine_similarity(self, pred_feats, ref_feats):
-        pred_norm = self.normalize_feats(pred_feats)
-        ref_norm = self.normalize_feats(ref_feats)
-
-        return np.mean(np.sum(pred_norm * ref_norm, axis=1))
-
     def quality(self):
         return self.LOWER
 
 
 class ReIDScore(FreIDMetric):
 
-    def __init__(self, device=torch.device("cpu"), reid_name="PCB-reid"):
-        super().__init__(device, reid_name)
+    def __init__(self, device=torch.device("cpu"), reid_name="PCB-reid", has_detector=True):
+        super().__init__(device, reid_name, has_detector)
 
     def calculate_score(self, preds, gts, batch_size=32):
         assert len(preds) == len(gts)
@@ -780,3 +882,230 @@ class ReIDScore(FreIDMetric):
 
     def quality(self):
         return self.HIGHER
+
+
+class FaceSimilarityScore(BaseMetric):
+
+    def __init__(self, device=torch.device("cpu"), has_detector=True):
+        """
+
+        Args:
+            device (torch.device):
+            has_detector (bool): use detector or not, default is True.
+        """
+
+        super().__init__(device=device)
+        self.has_detector = has_detector
+
+        if has_detector:
+            self.register_model(self.FACE_DETECTOR)
+
+        self.register_model(self.FACE_RECOGNITION)
+
+    def preprocess(self, x):
+        """
+
+        Args:
+            x (np.ndarray or torch.tensor): each element is [bs, 3, image_size, image_size]
+                        with float32 and color intensity [0, 1];
+
+        Returns:
+            out (np.ndarray or torch.tensor): (bs, image_size, image_size, 3),
+                 if self.has_detector is True, then it is in the range of [0, 255] with np.uint8;
+                 otherwise, it is the torch.tensor and its color is in the range of [-1, 1] with torch.float32.
+        """
+
+        x = x.clone()
+        if self.has_detector:
+            if not isinstance(x, np.ndarray):
+                x = x.numpy()
+                x *= 255
+                x = x.astype(np.uint8)
+            x = np.transpose(x, (0, 2, 3, 1))
+        else:
+            x *= 2
+            x -= 1
+            x = x.to(self.device)
+            x = F.interpolate(x, size=(self.FACE_RECOGNITION_SIZE, self.FACE_RECOGNITION_SIZE), mode="area")
+        return x
+
+    def detect_face(self, img):
+        """
+
+        Args:
+            img (torch.tensor): (bs, 3, height, width) is in the range of [0, 1] with torch.float32.
+
+        Returns:
+            face_cropped (torch.tensor): (bs, 3, face_size, face_size) is in the range of [-1, 1] with torch.float32.
+        """
+
+        # Get cropped and prewhitened image tensor
+        # img_cropped = mtcnn(img, save_path=<optional save path>)
+        proc_img = img.clone()
+        proc_img = proc_img.numpy()
+        proc_img *= 255
+        proc_img = proc_img.astype(np.uint8)
+        proc_img = np.transpose(proc_img, (0, 2, 3, 1))
+
+        img_cropped = self.model_zoos[self.FACE_DETECTOR](proc_img)
+
+        face_cropped = []
+        valid_ids = []
+        for i, cropped in enumerate(img_cropped):
+            if cropped is None:
+                cropped = F.interpolate(
+                    img[i:i + 1] * 2 - 1,
+                    size=(self.FACE_RECOGNITION_SIZE, self.FACE_RECOGNITION_SIZE),
+                    mode="area"
+                )[0]
+            else:
+                valid_ids.append(i)
+
+            # print(cropped.shape, cropped.max(), cropped.min(), img[i:i+1].max(), img[i:i+1].min())
+            face_cropped.append(cropped)
+
+        face_cropped = torch.stack(face_cropped).to(self.device)
+
+        return face_cropped, valid_ids
+
+    def forward(self, img):
+        """
+
+        Args:
+            img:
+
+        Returns:
+
+        """
+
+        with torch.no_grad():
+            if self.has_detector:
+                face_cropped, valid_ids = self.detect_face(img)
+            else:
+                face_cropped = self.preprocess(img)
+                valid_ids = list(range(img.shape[0]))
+
+            # print(face_cropped.shape, face_cropped.max(), face_cropped.min())
+            # Calculate embedding (unsqueeze to add batch dimension)
+            img_embedding = self.model_zoos[self.FACE_RECOGNITION](face_cropped, normalize=False)
+
+            img_embedding = img_embedding.cpu().numpy()
+
+        return img_embedding, valid_ids
+
+    def calculate_score(self, preds, gts, batch_size=32):
+        pred_feats = []
+        gt_feats = []
+
+        length = len(preds)
+        for i in range(int(math.ceil((length / batch_size)))):
+            pred_batch = preds[i * batch_size: (i + 1) * batch_size]
+            gt_batch = gts[i * batch_size: (i + 1) * batch_size]
+
+            pred_f, _ = self.forward(pred_batch)
+            gt_f, valid_ids = self.forward(gt_batch)
+
+            pred_feats.append(pred_f[valid_ids])
+            gt_feats.append(gt_f[valid_ids])
+
+        pred_feats = np.concatenate(pred_feats, axis=0)
+        gt_feats = np.concatenate(gt_feats, axis=0)
+
+        return self.cosine_similarity(pred_feats, gt_feats, norm_first=True)
+
+    def quality(self):
+        return self.HIGHER
+
+
+class FaceFrechetDistance(FaceSimilarityScore):
+    def __init__(self, device=torch.device("cpu"), has_detector=True):
+        super().__init__(device, has_detector)
+
+    def calculate_score(self, preds, gts, batch_size=32):
+        pred_feats = []
+        gt_feats = []
+
+        length = len(preds)
+        for i in range(int(math.ceil((length / batch_size)))):
+            pred_batch = preds[i * batch_size: (i + 1) * batch_size]
+            gt_batch = gts[i * batch_size: (i + 1) * batch_size]
+
+            pred_f = self.forward(pred_batch)
+            gt_f = self.forward(gt_batch)
+
+            pred_feats.append(pred_f)
+            gt_feats.append(gt_f)
+
+        pred_feats = np.concatenate(pred_feats, axis=0)
+        gt_feats = np.concatenate(gt_feats, axis=0)
+
+        return self.fid_score_func(pred_feats, gt_feats)
+
+    def quality(self):
+        return self.LOWER
+
+
+class ScaleShapePoseError(BaseMetric):
+    def __init__(self, device=torch.device("cpu")):
+        super().__init__(device)
+        self.register_model(self.HMR)
+
+        self.height, self.width = 224, 224
+
+    def quality(self):
+        return self.LOWER
+
+    def preprocess(self, x):
+        """
+
+        Args:
+            x (np.ndarray or torch.tensor): np.ndarray or torch.tensor, each element is [3, image_size, image_size]
+                        wth np.float32 and color intensity [0, 1];
+
+        Returns:
+            out (torch.tensor): (bs, 3, 224, 224) is in the range of [-1, 1].
+        """
+
+        x = x.clone()
+        x *= 2
+        x -= 1
+        x = F.interpolate(x, (self.height, self.width), mode="bilinear", align_corners=False)
+        x = x.to(self.device)
+        return x
+
+    def forward(self, pred):
+        """
+
+        Args:
+            x (torch.tensor): np.ndarray or torch.tensor, each element is
+                [bs, 3, image_size, image_size] wth torch.uint8 and color intensity [0, 255];
+
+        Returns:
+            smpls (np.ndarray): (bs, 85).
+        """
+
+        with torch.no_grad():
+            pred = self.preprocess(pred)
+            smpls = self.model_zoos[self.HMR](pred)
+            smpls = smpls.cpu().numpy()
+        return smpls
+
+    def calculate_score(self, preds, gts, batch_size=32):
+        pred_smpls = []
+        gt_smpls = []
+
+        length = len(preds)
+        for i in range(int(math.ceil((length / batch_size)))):
+            pred_batch = preds[i * batch_size: (i + 1) * batch_size]
+            gt_batch = gts[i * batch_size: (i + 1) * batch_size]
+
+            pred_f = self.forward(pred_batch)
+            gt_f = self.forward(gt_batch)
+
+            pred_smpls.append(pred_f)
+            gt_smpls.append(gt_f)
+
+        pred_smpls = np.concatenate(pred_smpls, axis=0)
+        gt_smpls = np.concatenate(gt_smpls, axis=0)
+
+        return self.ssp_abs_err_score_func(pred_smpls, gt_smpls)

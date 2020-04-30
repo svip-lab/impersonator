@@ -13,3 +13,4 @@ outputs/checkpoints
 thirdparty/neural_renderer/files.txt
 piao_scripts
 doc/bug_list.md
+thirdparty/his_evaluators/data
