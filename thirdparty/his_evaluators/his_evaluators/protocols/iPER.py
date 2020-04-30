@@ -282,8 +282,10 @@ class ICCVIPERProtocol(IPERProtocol):
     def __init__(self, data_dir="/p300/iPER"):
         super().__init__(data_dir)
 
+        self.NUM_SOURCES = 3
+
     def __len__(self):
-        return len(self.vid_names) * 3
+        return len(self.vid_names) * self.NUM_SOURCES
 
     def __getitem__(self, item):
         """
@@ -340,7 +342,8 @@ class ICCVIPERProtocol(IPERProtocol):
         src_img_paths = glob.glob(os.path.join(src_vid_path, "*"))
         src_img_paths.sort()
 
-        src_img_names = vid_info["s_n"]["3"][src_ids:src_ids+1]
+        # num_source = 3
+        src_img_names = vid_info["s_n"][str(self.NUM_SOURCES)][src_ids:src_ids+1]
         src_img_ids = [int(t.split(".")[0]) for t in src_img_names]
         eval_info["source"] = {
             "s_n": num_sources,
