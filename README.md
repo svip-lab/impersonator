@@ -60,7 +60,7 @@ unzip the `checkpoints.zip` and move them to `outputs` directory.
 wget -O outputs/checkpoints.zip https://1drv.ws/u/s!AjjUqiJZsj8whLNyoEh67Uu0LlxquA?e=dkOnhQ
 ```
 
-3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db) or
+3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s\!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db) or
 [BaiduPan](https://pan.baidu.com/s/1xAI96709Gvqahq9uYAEXYA), and then
 unzip the `samples.zip` and move them to `assets` directory.
 ```
