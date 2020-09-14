@@ -23,11 +23,11 @@ Liquid Warping GAN: A Unified Framework for Human Motion Imitation, Appearance T
 </p>
 
 ## Update News
-- [x] 07/04/2020, Add the [evaluation metrics](./thirdparty/his_evaluators/README.md) on iPER dataset.
+- [x] 10/05/2019, optimize the minimal requirements of GPU memory (at least `3.8GB` available).
 
 - [x] 10/24/2019, Imper-1.2.2, add the training document [train.md](./doc/train.md).
 
-- [x] 10/05/2019, optimize the minimal requirements of GPU memory (at least `3.8GB` available).
+- [x] 07/04/2020, Add the [evaluation metrics](./thirdparty/his_evaluators/README.md) on iPER dataset.
 
 ## Getting Started
 Python 3.6+, Pytorch 1.2, torchvision 0.4, cuda10.0, at least `3.8GB` GPU memory and other requirements.
@@ -60,11 +60,11 @@ unzip the `checkpoints.zip` and move them to `outputs` directory.
 wget -O outputs/checkpoints.zip https://1drv.ws/u/s!AjjUqiJZsj8whLNyoEh67Uu0LlxquA?e=dkOnhQ
 ```
 
-3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s\!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db) or
+3. Download `samples.zip` from [OneDrive](https://1drv.ms/u/s!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db) or
 [BaiduPan](https://pan.baidu.com/s/1xAI96709Gvqahq9uYAEXYA), and then
 unzip the `samples.zip` and move them to `assets` directory.
 ```
-wget -O assets/samples.zip https://1drv.ws/u/s!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db
+wget -O assets/samples.zip "https://1drv.ws/u/s\!AjjUqiJZsj8whLNz4BqnSgqrVwAXoQ?e=bC86db"
 ```
 
 ### Running Demo
