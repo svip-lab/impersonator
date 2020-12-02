@@ -22,15 +22,15 @@ setup(
     license='MIT License',
     test_suite='setup.test_all',
     install_requires=[
-        "scikit_image >= 0.16.2",
-        "torchvision >= 0.4.0",
+        "scikit_image >= 0.15.0",
+        "torchvision == 0.4.0",
+        "torch == 1.2",
         "scipy >= 1.2.1",
-        "opencv_contrib_python >= 3.2",
-        "tqdm >= 4.38.0",
-        "numpy >= 1.18.1",
-        "torch >= 1.2",
+        "opencv_contrib_python >= 3.4.2.17",
+        "tqdm >= 4.28.1",
+        "numpy >= 1.14.5",
         "setuptools >= 39.1.0",
-        "Pillow == 6.2.0",
+        "Pillow >= 6.2.0",
         "typing >= 3.7.4.1"
     ],
 )
