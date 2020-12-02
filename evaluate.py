@@ -59,24 +59,16 @@ class LWGEvaluatorModel(MotionImitationModel):
             out_dir = self.ci_out_dir
             count = self.num_preds_ci
             self.num_preds_ci += len(tgt_paths)
-        # outputs = self.model.inference(tgt_paths, tgt_smpls=tgt_smpls, cam_strategy=cam_strategy,
-        #                                visualizer=None, verbose=True)
-        #
-        # all_preds_files = []
-        # for i, preds in enumerate(outputs):
-        #     filename = "{:0>8}.jpg".format(count)
-        #     pred_file = os.path.join(out_dir, 'pred_' + filename)
-        #     count += 1
-        #
-        #     cv_utils.save_cv2_img(preds, pred_file, normalize=True)
-        #     all_preds_files.append(pred_file)
+        outputs = self.model.inference(tgt_paths, tgt_smpls=tgt_smpls, cam_strategy=cam_strategy,
+                                       visualizer=None, verbose=True)
 
         all_preds_files = []
-        for i in range(len(tgt_smpls)):
+        for i, preds in enumerate(outputs):
             filename = "{:0>8}.jpg".format(count)
             pred_file = os.path.join(out_dir, 'pred_' + filename)
             count += 1
 
+            cv_utils.save_cv2_img(preds, pred_file, normalize=True)
             all_preds_files.append(pred_file)
 
         return all_preds_files
@@ -141,7 +133,7 @@ if __name__ == "__main__":
         model=model,
         image_size=opt.image_size,
         pair_types=("ssim", "psnr", "lps", "face-CS", "OS-CS-reid"),
-        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "face-CS", "face-FD", "PCB-CS-reid", "PCB-freid"),
+        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "face-CS", "face-FD"),
         device=torch.device("cuda:0")
     )
 
