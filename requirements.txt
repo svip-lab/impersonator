@@ -6,7 +6,7 @@ scipy==1.2.1
 torch==1.2.0
 torchvision==0.4.0
 h5py==2.8.0
-scikit_image==0.15.0
+scikit_image==0.16.2
 visdom==0.1.8.9
 opencv_contrib_python==3.4.2.17
 matplotlib==3.1.1
