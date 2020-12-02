@@ -1,6 +1,7 @@
 .idea
 *.pyc
 *.zip
+*.venv
 pretrains
 assets/samples
 outputs/results
