@@ -1,6 +1,6 @@
 imageio==2.5.0
 tqdm==4.28.1
-setuptools==39.1.0
+setuptools>=39.1.0
 numpy==1.14.5
 scipy==1.2.1
 torch==1.2.0
