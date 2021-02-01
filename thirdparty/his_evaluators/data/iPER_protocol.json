@@ -240,7 +240,7 @@
         "4": ["000.jpg", "140.jpg", "240.jpg", "320.jpg"],
         "8": ["000.jpg", "080.jpg", "140.jpg", "220.jpg", "240.jpg", "280.jpg", "320.jpg", "360.jpg"]
       },
-      "mask": ["000.jpg", "080.jpg", "140.jpg", "220.jpg", "240.jpg", "280.jpg", "320.jpg", "360.jpg"],
+      "mask": ["080.jpg", "140.jpg", "220.jpg", "240.jpg", "280.jpg", "320.jpg", "360.jpg"],
       "novel view": true,
       "self_imitation": {
         "target": "004/1/1",

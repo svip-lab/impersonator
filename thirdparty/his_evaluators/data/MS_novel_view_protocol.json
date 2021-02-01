@@ -1,0 +1,2132 @@
+{
+  "val": {
+    "PeopleSnapshot_female-3-casual_1604_0093": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_female-3-casual_1604_0093",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_female-3-casual_1604_0093",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_female-3-sport_1650_0094": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_female-3-sport_1650_0094",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_female-3-sport_1650_0094",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-2-casual_1634_0095": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-2-casual_1634_0095",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-2-casual_1634_0095",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-2-outdoor_0890_0096": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-2-outdoor_0890_0096",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-2-outdoor_0890_0096",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-2-plaza_2053_0097": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-2-plaza_2053_0097",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-2-plaza_2053_0097",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-2-sport_1544_0098": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-2-sport_1544_0098",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-2-sport_1544_0098",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-5-outdoor_1541_0099": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-5-outdoor_1541_0099",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-5-outdoor_1541_0099",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "PeopleSnapshot_male-5-sport_1903_0100": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "PeopleSnapshot_male-5-sport_1903_0100",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "PeopleSnapshot_male-5-sport_1903_0100",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611515860795_0646_0101": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611515860795_0646_0101",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611515860795_0646_0101",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611516241372_1521_0102": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611516241372_1521_0102",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611516241372_1521_0102",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517160595_1530_0103": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517160595_1530_0103",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517160595_1530_0103",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517160626_1363_0104": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517160626_1363_0104",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517160626_1363_0104",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517160658_2235_0105": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517160658_2235_0105",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517160658_2235_0105",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517261115_1162_0106": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517261115_1162_0106",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517261115_1162_0106",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517437650_0613_0107": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517437650_0613_0107",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517437650_0613_0107",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517596592_0626_0108": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517596592_0626_0108",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517596592_0626_0108",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517851461_2211_0109": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517851461_2211_0109",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517851461_2211_0109",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517867589_1988_0110": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517867589_1988_0110",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517867589_1988_0110",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611517948766_1298_0111": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611517948766_1298_0111",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611517948766_1298_0111",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611518117147_1754_0112": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611518117147_1754_0112",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611518117147_1754_0112",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611519590101_0608_0113": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611519590101_0608_0113",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611519590101_0608_0113",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611520103063_2129_0114": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611520103063_2129_0114",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611520103063_2129_0114",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611520543211_0880_0115": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611520543211_0880_0115",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611520543211_0880_0115",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611520702831_1957_0116": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611520702831_1957_0116",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611520702831_1957_0116",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611520973931_0064_0117": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611520973931_0064_0117",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611520973931_0064_0117",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611521748896_0452_0118": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611521748896_0452_0118",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611521748896_0452_0118",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611521914479_0633_0119": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611521914479_0633_0119",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611521914479_0633_0119",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    },
+    "MG_125611522089953_1278_0120": {
+      "source": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "view angle": [
+        0,
+        45,
+        90,
+        135,
+        180,
+        225,
+        270,
+        315
+      ],
+      "s_n": {
+        "1": [
+          "frame_00000000.png"
+        ],
+        "2": [
+          "frame_00000000.png",
+          "frame_00000004.png"
+        ],
+        "4": [
+          "frame_00000000.png",
+          "frame_00000003.png",
+          "frame_00000004.png",
+          "frame_00000007.png"
+        ],
+        "8": [
+          "frame_00000000.png",
+          "frame_00000001.png",
+          "frame_00000003.png",
+          "frame_00000005.png",
+          "frame_00000004.png",
+          "frame_00000006.png",
+          "frame_00000007.png",
+          "frame_00000002.png"
+        ]
+      },
+      "mask": [
+        "frame_00000000.png",
+        "frame_00000001.png",
+        "frame_00000003.png",
+        "frame_00000005.png",
+        "frame_00000004.png",
+        "frame_00000006.png",
+        "frame_00000007.png",
+        "frame_00000002.png"
+      ],
+      "novel view": true,
+      "self_imitation": {
+        "target": "MG_125611522089953_1278_0120",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "cross_imitation": {
+        "target": "MG_125611522089953_1278_0120",
+        "range": [
+          0,
+          179
+        ]
+      },
+      "flag": [
+        0,
+        179
+      ]
+    }
+  }
+}
