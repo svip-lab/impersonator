@@ -140,8 +140,8 @@ if __name__ == "__main__":
     iPER_MI_evaluator.evaluate(
         model=model,
         image_size=opt.image_size,
-        pair_types=("ssim", "psnr", "lps"),
-        unpair_types=("is", "fid", "PCB-CS-reid", "PCB-freid", "OS-CS-reid", "OS-freid")
+        pair_types=("ssim", "psnr", "lps", "OS-CS-reid", "face-CS"),
+        unpair_types=("is", "fid", "OS-CS-reid", "OS-freid", "face-CS", "face-FD")
     )
 
 ```
