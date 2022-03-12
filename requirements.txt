@@ -11,6 +11,6 @@ visdom==0.1.8.9
 opencv_contrib_python==3.4.2.17
 matplotlib==3.1.1
 ipdb==0.12.2
-Pillow==6.2.0
+Pillow==9.0.1
 progressbar2==3.46.1
 tensorboardX==1.8
